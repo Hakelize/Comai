@@ -17,12 +17,16 @@ import com.comai.ui.screens.memory.MemoryScreen
 import com.comai.ui.screens.memory.MemoryViewModel
 import com.comai.voice.VoiceInteractionManager
 
+import com.comai.ui.screens.ramdashboard.RamContextDashboardScreen
+import com.comai.ui.screens.ramdashboard.RamContextDashboardViewModel
+
 object Routes {
     const val CHAT = "chat"
     const val AUDIO = "audio"
     const val DASHBOARD = "dashboard"
     const val MEMORY = "memory"
     const val CAPABILITY = "capability"
+    const val RAM_DASHBOARD = "ram_dashboard"
 }
 
 @Composable
@@ -62,7 +66,8 @@ fun ComaiNavGraph(
                 viewModel = dashboardViewModel,
                 onBackToChat = { navController.popBackStack() },
                 onNavigateToMemory = { navController.navigate(Routes.MEMORY) },
-                onNavigateToCapability = { navController.navigate(Routes.CAPABILITY) }
+                onNavigateToCapability = { navController.navigate(Routes.CAPABILITY) },
+                onNavigateToRamDashboard = { navController.navigate(Routes.RAM_DASHBOARD) }
             )
         }
 
@@ -76,6 +81,14 @@ fun ComaiNavGraph(
         composable(Routes.CAPABILITY) {
             CapabilityDashboardScreen(
                 viewModel = capabilityViewModel,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.RAM_DASHBOARD) {
+            val ramViewModel: RamContextDashboardViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+            RamContextDashboardScreen(
+                viewModel = ramViewModel,
                 onBack = { navController.popBackStack() }
             )
         }
