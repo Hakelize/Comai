@@ -141,6 +141,7 @@ class MainActivity : ComponentActivity() {
             }
         })[HomeViewModel::class.java]
 
+        // Personal Schedule (from main)
         val personalPlanRepository = com.comai.data.repository.PersonalPlanRepository(this)
         val personalScheduleViewModel = ViewModelProvider(this, object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
