@@ -101,6 +101,17 @@ class VoiceInteractionManager(
     }
 
     /**
+     * Checks whether offline/on-device recognition is supported (API 31+).
+     */
+    fun isOnDeviceAvailable(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+        } else {
+            false
+        }
+    }
+
+    /**
      * Single-tap start listening handler.
      * Prevents duplicate recognizers or multiple starts.
      */
@@ -153,8 +164,6 @@ class VoiceInteractionManager(
             isUsingOnDeviceRecognizer = false
             speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
         }
-
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
 
         if (speechRecognizer == null) {
             Log.e(TAG, "SPEECH_ERROR: SpeechRecognizer instance creation returned null")
