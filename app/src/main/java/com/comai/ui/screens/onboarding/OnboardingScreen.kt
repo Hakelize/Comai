@@ -36,6 +36,8 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import com.comai.ui.components.ComaiCompactTimeBar
+import com.comai.util.Time12
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -758,7 +760,7 @@ private fun ProfileAndRoutineStepView(
         OutlinedTextField(
             value = name,
             onValueChange = onNameChange,
-            placeholder = { Text("e.g. Rakesh") },
+            placeholder = { Text("Enter your name") },
             singleLine = true,
             isError = nameError != null,
             shape = RoundedCornerShape(12.dp),
@@ -994,24 +996,11 @@ private fun ProfileAndRoutineStepView(
             Column(modifier = Modifier.weight(1f)) {
                 Text("Wake up *", color = TextSecondary, fontSize = 12.sp)
                 Spacer(modifier = Modifier.height(4.dp))
-                OutlinedTextField(
+                ComaiCompactTimeBar(
                     value = wakeTime,
                     onValueChange = onWakeTimeChange,
-                    placeholder = { Text("07:00") },
-                    singleLine = true,
                     isError = wakeTimeError != null,
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = ElectricTeal,
-                        unfocusedBorderColor = DarkSurface,
-                        errorBorderColor = Color(0xFFE57373),
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary,
-                        focusedContainerColor = DarkSurfaceVariant,
-                        unfocusedContainerColor = DarkSurfaceVariant,
-                        errorContainerColor = DarkSurfaceVariant
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+                    defaultTime = Time12(7, 0, true)
                 )
                 if (wakeTimeError != null) {
                     Spacer(modifier = Modifier.height(2.dp))
@@ -1028,24 +1017,11 @@ private fun ProfileAndRoutineStepView(
             Column(modifier = Modifier.weight(1f)) {
                 Text("Leave home *", color = TextSecondary, fontSize = 12.sp)
                 Spacer(modifier = Modifier.height(4.dp))
-                OutlinedTextField(
+                ComaiCompactTimeBar(
                     value = leaveHomeTime,
                     onValueChange = onLeaveHomeTimeChange,
-                    placeholder = { Text("08:30") },
-                    singleLine = true,
                     isError = leaveHomeTimeError != null,
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = ElectricTeal,
-                        unfocusedBorderColor = DarkSurface,
-                        errorBorderColor = Color(0xFFE57373),
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary,
-                        focusedContainerColor = DarkSurfaceVariant,
-                        unfocusedContainerColor = DarkSurfaceVariant,
-                        errorContainerColor = DarkSurfaceVariant
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+                    defaultTime = Time12(8, 30, true)
                 )
                 if (leaveHomeTimeError != null) {
                     Spacer(modifier = Modifier.height(2.dp))
@@ -1069,24 +1045,11 @@ private fun ProfileAndRoutineStepView(
             Column(modifier = Modifier.weight(1f)) {
                 Text("Return home *", color = TextSecondary, fontSize = 12.sp)
                 Spacer(modifier = Modifier.height(4.dp))
-                OutlinedTextField(
+                ComaiCompactTimeBar(
                     value = returnHomeTime,
                     onValueChange = onReturnHomeTimeChange,
-                    placeholder = { Text("18:00") },
-                    singleLine = true,
                     isError = returnHomeTimeError != null,
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = ElectricTeal,
-                        unfocusedBorderColor = DarkSurface,
-                        errorBorderColor = Color(0xFFE57373),
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary,
-                        focusedContainerColor = DarkSurfaceVariant,
-                        unfocusedContainerColor = DarkSurfaceVariant,
-                        errorContainerColor = DarkSurfaceVariant
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+                    defaultTime = Time12(6, 0, false)
                 )
                 if (returnHomeTimeError != null) {
                     Spacer(modifier = Modifier.height(2.dp))
@@ -1103,24 +1066,11 @@ private fun ProfileAndRoutineStepView(
             Column(modifier = Modifier.weight(1f)) {
                 Text("Sleep *", color = TextSecondary, fontSize = 12.sp)
                 Spacer(modifier = Modifier.height(4.dp))
-                OutlinedTextField(
+                ComaiCompactTimeBar(
                     value = sleepTime,
                     onValueChange = onSleepTimeChange,
-                    placeholder = { Text("23:00") },
-                    singleLine = true,
                     isError = sleepTimeError != null,
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = ElectricTeal,
-                        unfocusedBorderColor = DarkSurface,
-                        errorBorderColor = Color(0xFFE57373),
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary,
-                        focusedContainerColor = DarkSurfaceVariant,
-                        unfocusedContainerColor = DarkSurfaceVariant,
-                        errorContainerColor = DarkSurfaceVariant
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+                    defaultTime = Time12(11, 0, false)
                 )
                 if (sleepTimeError != null) {
                     Spacer(modifier = Modifier.height(2.dp))

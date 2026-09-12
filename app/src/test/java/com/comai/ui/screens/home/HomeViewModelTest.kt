@@ -51,11 +51,11 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `greeting falls back to there when name is empty`() {
+    fun `greeting falls back to time of day when name is empty`() {
         val profile = UserOnboardingProfile(name = "")
         val morningCal = createCalendar(8, 0)
         val state = HomeViewModel.buildHomeState(profile, morningCal)
-        assertEquals("Good morning, there", state.greeting)
+        assertEquals("Good morning", state.greeting)
     }
 
     @Test
