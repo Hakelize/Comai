@@ -101,6 +101,14 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".engine.gemma.GemmaTestReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.comai.action.TEST_GEMMA_GPU" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>

@@ -5,6 +5,8 @@ import com.comai.contextengine.db.UserProfileDao
 import com.comai.voice.ComaiLanguage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -34,6 +36,10 @@ class OnboardingTest {
 
     private class FakeUserProfileDao : UserProfileDao {
         var savedProfile: UserProfile? = null
+
+        override fun getUserProfileFlow(): Flow<UserProfile?> {
+            return flowOf(savedProfile)
+        }
 
         override suspend fun getUserProfile(): UserProfile? {
             return savedProfile
