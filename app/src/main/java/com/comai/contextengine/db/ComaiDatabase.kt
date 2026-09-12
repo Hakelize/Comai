@@ -5,12 +5,16 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.comai.contextengine.database.ContextLogDao
+import com.comai.contextengine.database.ContextLogEntity
+import com.comai.contextengine.database.ProactiveEventDao
+import com.comai.contextengine.database.ProactiveEventEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * ComaiDatabase - Main Room Database for User Profile, Daily Logs, Routine Programs, and Personalization State.
+ * ComaiDatabase - Main Room Database for User Profile, Daily Logs, Routine Programs, Personalization State, Context Logs, and Proactive Events.
  */
 @Database(
     entities = [
@@ -18,9 +22,11 @@ import kotlinx.coroutines.launch
         DailyLog::class,
         Program::class,
         PersonalizationState::class,
-        Memory::class
+        Memory::class,
+        ContextLogEntity::class,
+        ProactiveEventEntity::class
     ],
-    version = 2,
+    version = 5,
     exportSchema = false
 )
 abstract class ComaiDatabase : RoomDatabase() {
@@ -30,6 +36,8 @@ abstract class ComaiDatabase : RoomDatabase() {
     abstract fun programDao(): ProgramDao
     abstract fun personalizationStateDao(): PersonalizationStateDao
     abstract fun memoryDao(): MemoryDao
+    abstract fun contextLogDao(): ContextLogDao
+    abstract fun proactiveEventDao(): ProactiveEventDao
 
     companion object {
         const val DATABASE_NAME = "comai_core_db"
@@ -56,6 +64,57 @@ abstract class ComaiDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `context_logs` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `timestampMs` INTEGER NOT NULL,
+                        `eventType` TEXT NOT NULL,
+                        `task` TEXT NOT NULL,
+                        `confidence` REAL NOT NULL,
+                        `signalsSummary` TEXT NOT NULL,
+                        `isEscalated` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
+        val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `proactive_events` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `timestampMs` INTEGER NOT NULL,
+                        `eventId` TEXT NOT NULL,
+                        `eventType` TEXT NOT NULL,
+                        `priority` TEXT NOT NULL,
+                        `targetTask` TEXT NOT NULL,
+                        `targetConstraints` TEXT NOT NULL,
+                        `contextSummary` TEXT NOT NULL,
+                        `isAcknowledged` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
+        val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `context_logs` ADD COLUMN `locationPlace` TEXT NOT NULL DEFAULT 'Home'")
+                db.execSQL("ALTER TABLE `context_logs` ADD COLUMN `activityType` TEXT NOT NULL DEFAULT 'STILL'")
+                db.execSQL("ALTER TABLE `context_logs` ADD COLUMN `routineState` TEXT NOT NULL DEFAULT 'WORK_DAY_ROUTINE'")
+                db.execSQL("ALTER TABLE `context_logs` ADD COLUMN `isRoutineDeviation` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `context_logs` ADD COLUMN `deviationMinutes` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `context_logs` ADD COLUMN `confidenceScore` REAL NOT NULL DEFAULT 1.0")
+                db.execSQL("ALTER TABLE `context_logs` ADD COLUMN `confidenceLevel` TEXT NOT NULL DEFAULT 'HIGH'")
+                db.execSQL("ALTER TABLE `context_logs` ADD COLUMN `triggerTask` TEXT NOT NULL DEFAULT 'GENERAL_CHECKIN'")
+            }
+        }
+
         fun getInstance(context: Context): ComaiDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -63,7 +122,7 @@ abstract class ComaiDatabase : RoomDatabase() {
                     ComaiDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .fallbackToDestructiveMigration()
                     .addCallback(DatabaseCallback(context))
                     .build()
@@ -77,18 +136,7 @@ abstract class ComaiDatabase : RoomDatabase() {
                 super.onCreate(db)
                 CoroutineScope(Dispatchers.IO).launch {
                     val instance = getInstance(context)
-                    instance.userProfileDao().insertOrUpdateProfile(UserProfile())
-                    
-                    val defaultPrograms = listOf(
-                        Program(dayOfWeek = "MONDAY", isWorkDay = true),
-                        Program(dayOfWeek = "TUESDAY", isWorkDay = true),
-                        Program(dayOfWeek = "WEDNESDAY", isWorkDay = true),
-                        Program(dayOfWeek = "THURSDAY", isWorkDay = true),
-                        Program(dayOfWeek = "FRIDAY", isWorkDay = true),
-                        Program(dayOfWeek = "SATURDAY", isWorkDay = false, expectedWakeTime = "08:30"),
-                        Program(dayOfWeek = "SUNDAY", isWorkDay = false, expectedWakeTime = "08:30")
-                    )
-                    instance.programDao().insertPrograms(defaultPrograms)
+                    MockDatabaseSeeder.seedMockData(instance)
                 }
             }
         }

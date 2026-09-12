@@ -36,7 +36,8 @@ enum class VoiceState {
  *
  * Responsibilities:
  * - Single-tap push-to-talk voice capture.
- * - Prioritizes on-device SpeechRecognizer (API 31+) with fallback to standard recognizer.
+ * - Prioritizes on-device SpeechRecognizer (API 31+) with automatic fallback to standard SpeechRecognizer
+ *   when on-device language models or permissions are unavailable on specific OEM hardware (Error 13).
  * - Prevents duplicate startListening() calls.
  * - Feeds final recognized text directly into ChatViewModel's message pipeline.
  * - Prevents audio feedback loops (stops TTS before listening; ignores mic while speaking).
@@ -59,6 +60,8 @@ class VoiceInteractionManager(
     val partialText: StateFlow<String> = _partialText.asStateFlow()
 
     private var speechRecognizer: SpeechRecognizer? = null
+    private var isUsingOnDeviceRecognizer: Boolean = false
+    private var forceStandardRecognizer: Boolean = false
     private val mainHandler = Handler(Looper.getMainLooper())
 
     var onPermissionRequired: (() -> Unit)? = null
@@ -100,10 +103,14 @@ class VoiceInteractionManager(
      * Prevents duplicate recognizers or multiple starts.
      */
     fun startListening() {
-        Log.i(TAG, "MIC_REQUESTED")
+        startListeningInternal(isFallbackAttempt = false)
+    }
 
-        // 1. Guard: Check current state to prevent duplicate start calls
-        if (_state.value == VoiceState.LISTENING || _state.value == VoiceState.PROCESSING) {
+    private fun startListeningInternal(isFallbackAttempt: Boolean) {
+        Log.i(TAG, "MIC_REQUESTED (fallbackMode=$forceStandardRecognizer, isFallbackAttempt=$isFallbackAttempt)")
+
+        // 1. Guard: Check current state to prevent duplicate start calls unless this is an immediate internal fallback
+        if (!isFallbackAttempt && (_state.value == VoiceState.LISTENING || _state.value == VoiceState.PROCESSING)) {
             Log.d(TAG, "Duplicate startListening() ignored in state: ${_state.value}")
             return
         }
@@ -127,20 +134,28 @@ class VoiceInteractionManager(
         // 3. Audio feedback prevention: Stop any ongoing TTS immediately
         ttsManager.stop()
 
-        // 4. Create SpeechRecognizer instance (prefer on-device if available)
+        // 4. Create SpeechRecognizer instance (prefer on-device if available and not explicitly forced to standard)
         destroyRecognizer()
 
-        val onDevice = isOnDeviceAvailable()
-        speechRecognizer = if (onDevice && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val canTryOnDevice = !forceStandardRecognizer && isOnDeviceAvailable()
+        if (canTryOnDevice && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             Log.i(TAG, "SPEECH_RECOGNIZER_CREATED: On-Device SpeechRecognizer (API 31+)")
-            SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+            isUsingOnDeviceRecognizer = true
+            speechRecognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
         } else {
             Log.i(TAG, "SPEECH_RECOGNIZER_CREATED: Standard Android SpeechRecognizer")
-            SpeechRecognizer.createSpeechRecognizer(context)
+            isUsingOnDeviceRecognizer = false
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
         }
 
         if (speechRecognizer == null) {
             Log.e(TAG, "SPEECH_ERROR: SpeechRecognizer instance creation failed")
+            if (isUsingOnDeviceRecognizer) {
+                Log.w(TAG, "SPEECH_FALLBACK: On-device creation null. Retrying with standard SpeechRecognizer.")
+                forceStandardRecognizer = true
+                startListeningInternal(isFallbackAttempt = true)
+                return
+            }
             _state.value = VoiceState.ERROR
             mainHandler.postDelayed({ _state.value = VoiceState.IDLE }, 1500)
             return
@@ -165,6 +180,13 @@ class VoiceInteractionManager(
                 speechRecognizer?.startListening(intent)
             } catch (e: Exception) {
                 Log.e(TAG, "SPEECH_ERROR: startListening exception: ${e.message}")
+                if (isUsingOnDeviceRecognizer) {
+                    Log.w(TAG, "SPEECH_FALLBACK: startListening failed on-device. Retrying with standard SpeechRecognizer.")
+                    forceStandardRecognizer = true
+                    destroyRecognizer()
+                    startListeningInternal(isFallbackAttempt = true)
+                    return@post
+                }
                 _state.value = VoiceState.ERROR
                 destroyRecognizer()
                 mainHandler.postDelayed({ _state.value = VoiceState.IDLE }, 1500)
@@ -206,7 +228,7 @@ class VoiceInteractionManager(
 
     private fun createRecognitionListener() = object : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) {
-            Log.i(TAG, "AUDIO_CAPTURE_STARTED")
+            Log.i(TAG, "AUDIO_CAPTURE_STARTED (OnDevice=$isUsingOnDeviceRecognizer)")
         }
 
         override fun onBeginningOfSpeech() {
@@ -234,9 +256,20 @@ class VoiceInteractionManager(
                 SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer busy"
                 SpeechRecognizer.ERROR_SERVER -> "Server error"
                 SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Speech timeout (silence)"
+                12 -> "Language model not supported (ERROR_LANGUAGE_NOT_SUPPORTED)"
+                13 -> "Language model unavailable on-device (ERROR_LANGUAGE_UNAVAILABLE)"
                 else -> "Error code: $error"
             }
-            Log.w(TAG, "SPEECH_ERROR: $errorMsg ($error)")
+            Log.w(TAG, "SPEECH_ERROR: $errorMsg ($error), onDevice=$isUsingOnDeviceRecognizer")
+
+            // Check if fallback to standard recognizer should be triggered for OEM on-device errors (e.g. Error 13)
+            if (isUsingOnDeviceRecognizer && (error == 13 || error == 12 || error == SpeechRecognizer.ERROR_CLIENT || error == SpeechRecognizer.ERROR_SERVER)) {
+                Log.w(TAG, "SPEECH_FALLBACK: On-device recognizer failed with error $error ($errorMsg). Retrying immediately with standard SpeechRecognizer.")
+                forceStandardRecognizer = true
+                destroyRecognizer()
+                startListeningInternal(isFallbackAttempt = true)
+                return
+            }
 
             if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
                 Log.i(TAG, "NO_MATCH: No speech detected or timeout")
