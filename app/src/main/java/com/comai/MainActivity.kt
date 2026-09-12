@@ -141,6 +141,14 @@ class MainActivity : ComponentActivity() {
             }
         })[HomeViewModel::class.java]
 
+        val personalPlanRepository = com.comai.data.repository.PersonalPlanRepository(this)
+        val personalScheduleViewModel = ViewModelProvider(this, object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
+                return com.comai.ui.screens.schedule.PersonalScheduleViewModel(personalPlanRepository) as T
+            }
+        })[com.comai.ui.screens.schedule.PersonalScheduleViewModel::class.java]
+
         val startDestination = if (onboardingPreferences.isOnboardingCompleted()) {
             com.comai.ui.navigation.Routes.HOME
         } else {
@@ -157,6 +165,7 @@ class MainActivity : ComponentActivity() {
                     dashboardViewModel = dashboardViewModel,
                     memoryViewModel = memoryViewModel,
                     capabilityViewModel = capabilityViewModel,
+                    personalScheduleViewModel = personalScheduleViewModel,
                     onboardingViewModel = onboardingViewModel,
                     voiceManager = voiceManager,
                     onLanguageChanged = { lang ->
@@ -164,6 +173,9 @@ class MainActivity : ComponentActivity() {
                         ttsManager.setLanguage(lang.ttsLocale)
                         chatViewModel.setLanguage(lang)
                         languagePrefs.setLanguage(lang)
+                        val currentProf = onboardingPreferences.getProfile()
+                        onboardingPreferences.saveProfile(currentProf.copy(preferredLanguage = lang))
+                        homeViewModel.refreshState()
                     }
                 )
             }

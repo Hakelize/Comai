@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.comai.contextengine.db.UserProfile
 import com.comai.contextengine.db.UserProfileDao
+import com.comai.util.TimeUtils
 import com.comai.voice.ComaiLanguage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -64,10 +65,10 @@ class OnboardingViewModel(
                 workplace = saved.workplace,
                 college = saved.college,
                 placeName = saved.placeName,
-                wakeTime = saved.wakeTime,
-                leaveHomeTime = saved.leaveHomeTime,
-                returnHomeTime = saved.returnHomeTime,
-                sleepTime = saved.sleepTime,
+                wakeTime = if (saved.wakeTime.isNotBlank()) TimeUtils.normalizeTo12Hour(saved.wakeTime) else "",
+                leaveHomeTime = if (saved.leaveHomeTime.isNotBlank()) TimeUtils.normalizeTo12Hour(saved.leaveHomeTime) else "",
+                returnHomeTime = if (saved.returnHomeTime.isNotBlank()) TimeUtils.normalizeTo12Hour(saved.returnHomeTime) else "",
+                sleepTime = if (saved.sleepTime.isNotBlank()) TimeUtils.normalizeTo12Hour(saved.sleepTime) else "",
                 travelMode = saved.travelMode
             )
         }

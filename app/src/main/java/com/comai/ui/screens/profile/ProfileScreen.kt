@@ -11,9 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,6 +24,12 @@ import com.comai.ui.components.ComaiBottomBar
 import com.comai.ui.navigation.Routes
 import com.comai.ui.screens.home.HomeViewModel
 import com.comai.ui.theme.*
+import com.comai.util.TimeUtils
+import com.comai.voice.ComaiLanguage
+
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.window.Dialog
 
 @Composable
 fun ProfileScreen(
@@ -33,10 +37,40 @@ fun ProfileScreen(
     onNavigateToHome: () -> Unit,
     onNavigateToChat: () -> Unit,
     onNavigateToRoutine: () -> Unit,
-    onNavigateToMemory: () -> Unit
+    onNavigateToMemory: () -> Unit,
+    onNavigateToPersonalSchedule: () -> Unit = {},
+    onLanguageChanged: (ComaiLanguage) -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val onboardingPreferences = remember { com.comai.ui.screens.onboarding.OnboardingPreferences(context) }
     val homeState by homeViewModel.uiState.collectAsState()
     val profile = homeState.profile
+    var showLanguageDialog by remember { mutableStateOf(false) }
+    var showEditNameDialog by remember { mutableStateOf(false) }
+
+    if (showEditNameDialog) {
+        EditNameDialog(
+            currentName = profile.name,
+            onDismiss = { showEditNameDialog = false },
+            onSave = { newName ->
+                val currentProf = onboardingPreferences.getProfile()
+                onboardingPreferences.saveProfile(currentProf.copy(name = newName))
+                homeViewModel.refreshState()
+                showEditNameDialog = false
+            }
+        )
+    }
+
+    if (showLanguageDialog) {
+        LanguageSelectionDialog(
+            currentLanguage = profile.preferredLanguage,
+            onDismiss = { showLanguageDialog = false },
+            onLanguageSelected = { lang ->
+                onLanguageChanged(lang)
+                showLanguageDialog = false
+            }
+        )
+    }
 
     Scaffold(
         containerColor = DarkBackground,
@@ -77,12 +111,27 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            Text(
-                text = profile.name.ifBlank { "User" },
-                color = TextPrimary,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = profile.name.ifBlank { "User" },
+                    color = TextPrimary,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                IconButton(onClick = { showEditNameDialog = true }) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit Name",
+                        tint = ElectricTeal,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(6.dp))
 
@@ -95,7 +144,7 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // ── Primary Details ───────────────────────────────────────
+            // ── Primary Details (General Settings) ────────────────────
             Surface(
                 color = Color(0xFF11151F),
                 shape = RoundedCornerShape(18.dp),
@@ -115,7 +164,9 @@ fun ProfileScreen(
                     ProfileItemRow(
                         label = "Preferred Language",
                         value = profile.preferredLanguage.displayName,
-                        icon = Icons.Outlined.Translate
+                        icon = Icons.Outlined.Translate,
+                        isClickable = true,
+                        onClick = { showLanguageDialog = true }
                     )
 
                     HorizontalDivider(color = Color(0xFF1A2130), modifier = Modifier.padding(vertical = 10.dp))
@@ -149,7 +200,63 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // ── Schedule Summary ──────────────────────────────────────
+            // ── Personal Schedule (Timed Plans / Reminders) ─────────────
+            Surface(
+                color = Color(0xFF11151F),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, Color(0xFF1E2638)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onNavigateToPersonalSchedule() }
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF14242A)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.EventNote,
+                            contentDescription = null,
+                            tint = ElectricTeal,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Personal Schedule",
+                            color = TextPrimary,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Custom reminders & timed plans (e.g. Drink water, Call Mom)",
+                            color = TextSecondary,
+                            fontSize = 12.sp
+                        )
+                    }
+
+                    Icon(
+                        imageVector = Icons.Outlined.ChevronRight,
+                        contentDescription = null,
+                        tint = TextSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ── Baseline Schedule Summary ─────────────────────────────
             Surface(
                 color = Color(0xFF11151F),
                 shape = RoundedCornerShape(18.dp),
@@ -166,10 +273,26 @@ fun ProfileScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    ScheduleItemRow(label = "Wake-up Time", time = profile.wakeTime.ifBlank { "07:00" }, icon = Icons.Outlined.WbSunny)
-                    ScheduleItemRow(label = "Leave Home", time = profile.leaveHomeTime.ifBlank { "08:30" }, icon = Icons.Outlined.Logout)
-                    ScheduleItemRow(label = "Return Home", time = profile.returnHomeTime.ifBlank { "18:00" }, icon = Icons.Outlined.Home)
-                    ScheduleItemRow(label = "Sleep Time", time = profile.sleepTime.ifBlank { "23:00" }, icon = Icons.Outlined.Nightlight)
+                    ScheduleItemRow(
+                        label = "Wake-up Time",
+                        time = TimeUtils.normalizeTo12Hour(profile.wakeTime, "7:00 AM"),
+                        icon = Icons.Outlined.WbSunny
+                    )
+                    ScheduleItemRow(
+                        label = "Leave Home",
+                        time = TimeUtils.normalizeTo12Hour(profile.leaveHomeTime, "8:30 AM"),
+                        icon = Icons.Outlined.Logout
+                    )
+                    ScheduleItemRow(
+                        label = "Return Home",
+                        time = TimeUtils.normalizeTo12Hour(profile.returnHomeTime, "6:00 PM"),
+                        icon = Icons.Outlined.Home
+                    )
+                    ScheduleItemRow(
+                        label = "Sleep Time",
+                        time = TimeUtils.normalizeTo12Hour(profile.sleepTime, "11:00 PM"),
+                        icon = Icons.Outlined.Nightlight
+                    )
                 }
             }
 
@@ -267,10 +390,14 @@ fun ProfileScreen(
 private fun ProfileItemRow(
     label: String,
     value: String,
-    icon: ImageVector
+    icon: ImageVector,
+    isClickable: Boolean = false,
+    onClick: (() -> Unit)? = null
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (isClickable && onClick != null) Modifier.clickable { onClick() } else Modifier),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -288,12 +415,23 @@ private fun ProfileItemRow(
                 fontSize = 13.sp
             )
         }
-        Text(
-            text = value,
-            color = TextPrimary,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = value,
+                color = if (isClickable) ElectricTeal else TextPrimary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
+            )
+            if (isClickable) {
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.Outlined.ChevronRight,
+                    contentDescription = null,
+                    tint = ElectricTeal,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
     }
 }
 
@@ -330,5 +468,82 @@ private fun ScheduleItemRow(
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium
         )
+    }
+}
+
+@Composable
+fun EditNameDialog(
+    currentName: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var name by remember { mutableStateOf(currentName) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            color = Color(0xFF131722),
+            shape = RoundedCornerShape(20.dp),
+            border = BorderStroke(1.dp, Color(0xFF222B3D)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentHeight()
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.Start
+            ) {
+                Text(
+                    text = "Edit Your Name",
+                    color = TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    placeholder = { Text("Enter your name") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = ElectricTeal,
+                        unfocusedBorderColor = DarkSurface,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedContainerColor = DarkSurfaceVariant,
+                        unfocusedContainerColor = DarkSurfaceVariant
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel", color = TextSecondary, fontSize = 14.sp)
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Button(
+                        onClick = {
+                            onSave(name.trim())
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = ElectricTeal,
+                            contentColor = DarkBackground
+                        ),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Save", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                }
+            }
+        }
     }
 }

@@ -3,32 +3,25 @@ package com.comai.ui.screens.home
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.comai.data.models.ChatMessage
 import com.comai.ui.components.ComaiBottomBar
+import com.comai.ui.components.HomeGreeting
+import com.comai.ui.components.HomeGreetingUtils
 import com.comai.ui.components.SiriVoiceOrb
+import com.comai.ui.components.VoiceSubtitle
 import com.comai.ui.navigation.Routes
 import com.comai.ui.screens.chat.ChatViewModel
 import com.comai.ui.theme.*
-import com.comai.voice.ComaiLanguage
 import com.comai.voice.VoiceInteractionManager
 import com.comai.voice.VoiceState
 
@@ -41,11 +34,14 @@ fun VoiceHomeScreen(
     onNavigateToRoutine: () -> Unit,
     onNavigateToProfile: () -> Unit,
     onNavigateToMemory: () -> Unit,
-    onNavigateToDashboard: () -> Unit = {},
-    onLanguageChanged: (ComaiLanguage) -> Unit = {}
+    onNavigateToDashboard: () -> Unit = {}
 ) {
-    // ── Observe home state ──────────────────────────────────────────
-    val homeState by homeViewModel.uiState.collectAsState()
+    // ── Observe user profile for dynamic name ────────────────────────
+    val homeUiState by homeViewModel.uiState.collectAsState()
+    val userName = homeUiState.profile.name
+    val greetingText = remember(userName) {
+        HomeGreetingUtils.computeGreeting(userName)
+    }
 
     // ── Observe voice state ──────────────────────────────────────────
     val voiceState by voiceManager?.state?.collectAsState()
@@ -54,18 +50,29 @@ fun VoiceHomeScreen(
         ?: remember { mutableStateOf("") }
     val rmsDb by voiceManager?.rmsDb?.collectAsState()
         ?: remember { mutableStateOf(0f) }
-
-    // ── Language state ───────────────────────────────────────────────
-    val currentLanguage by voiceManager?.language?.collectAsState()
-        ?: remember { mutableStateOf(ComaiLanguage.ENGLISH) }
     val errorMessage by voiceManager?.errorMessage?.collectAsState()
         ?: remember { mutableStateOf(null) }
-    var showLanguagePicker by remember { mutableStateOf(false) }
 
     // ── Latest AI response ───────────────────────────────────────────
     val messages by chatViewModel.messages.collectAsState()
+    val initialMessageCount = remember { messages.size }
     val lastAiMessage: ChatMessage? = remember(messages) {
         messages.lastOrNull { !it.isFromUser }
+    }
+
+    // ── Greeting Lifecycle: disappears as soon as voice interaction begins ──
+    var hasUserInteracted by remember { mutableStateOf(false) }
+
+    LaunchedEffect(partialText, voiceState, messages.size) {
+        if (!hasUserInteracted) {
+            if (partialText.isNotBlank() ||
+                voiceState == VoiceState.PROCESSING ||
+                voiceState == VoiceState.SPEAKING ||
+                messages.size > initialMessageCount
+            ) {
+                hasUserInteracted = true
+            }
+        }
     }
 
     // ── State label text ─────────────────────────────────────────────
@@ -74,7 +81,7 @@ fun VoiceHomeScreen(
         VoiceState.LISTENING -> "Listening..."
         VoiceState.PROCESSING -> "Thinking..."
         VoiceState.SPEAKING -> "Speaking..."
-        VoiceState.ERROR -> "Something went wrong. Tap to try again."
+        VoiceState.ERROR -> "Tap to retry"
     }
 
     val stateColor = when (voiceState) {
@@ -85,19 +92,12 @@ fun VoiceHomeScreen(
         VoiceState.ERROR -> ErrorRed
     }
 
-    // ── Live card content ────────────────────────────────────────────
-    val cardText = when (voiceState) {
-        VoiceState.LISTENING -> partialText.ifBlank { null }
-        VoiceState.PROCESSING -> partialText.ifBlank { null }
-        VoiceState.SPEAKING -> lastAiMessage?.content
-        VoiceState.ERROR -> errorMessage ?: "Something went wrong. Tap to try again."
-        VoiceState.IDLE -> lastAiMessage?.content
-    }
-    val showCard = !cardText.isNullOrBlank()
-
-    // Refresh state when returning to screen
+    // Automatically enter listening state when opening Home
     LaunchedEffect(Unit) {
         homeViewModel.refreshState()
+        if (voiceManager?.state?.value == VoiceState.IDLE) {
+            voiceManager.startListening()
+        }
     }
 
     Scaffold(
@@ -124,14 +124,13 @@ fun VoiceHomeScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // ── Top row: branding + language selector ────────────────
-            Row(
+            // ── Top branding (Clean, minimal, no cards, no language selector) ──
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 24.dp, vertical = 20.dp),
+                contentAlignment = Alignment.CenterStart
             ) {
                 Text(
                     text = "COMAI",
@@ -140,60 +139,9 @@ fun VoiceHomeScreen(
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 3.sp
                 )
-
-                // Language selector pill
-                Box {
-                    Surface(
-                        color = Color(0xFF151922),
-                        shape = RoundedCornerShape(18.dp),
-                        border = BorderStroke(1.dp, Color(0xFF222A3A)),
-                        modifier = Modifier.clickable { showLanguagePicker = !showLanguagePicker }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Translate,
-                                contentDescription = "Language",
-                                tint = ElectricTeal,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = currentLanguage.displayName,
-                                color = TextPrimary,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-
-                    DropdownMenu(
-                        expanded = showLanguagePicker,
-                        onDismissRequest = { showLanguagePicker = false },
-                        modifier = Modifier.background(DarkSurface)
-                    ) {
-                        ComaiLanguage.entries.forEach { lang ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = lang.displayName,
-                                        color = if (lang == currentLanguage) ElectricTeal else TextPrimary,
-                                        fontWeight = if (lang == currentLanguage) FontWeight.Bold else FontWeight.Normal
-                                    )
-                                },
-                                onClick = {
-                                    onLanguageChanged(lang)
-                                    showLanguagePicker = false
-                                }
-                            )
-                        }
-                    }
-                }
             }
 
-            // ── Central content: greeting + orb + state label ────────
+            // ── Central Voice Orb Focus & Dynamic Greeting ───────────
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -201,22 +149,23 @@ fun VoiceHomeScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Subtle greeting
-                Text(
-                    text = homeState.greeting,
-                    color = TextSecondary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 0.3.sp
-                )
+                // Dynamic time-based greeting above the orb
+                AnimatedVisibility(
+                    visible = !hasUserInteracted,
+                    enter = fadeIn(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        HomeGreeting(greeting = greetingText)
+                        Spacer(modifier = Modifier.height(36.dp))
+                    }
+                }
 
-                Spacer(modifier = Modifier.height(36.dp))
-
-                // ── Central Siri-style Voice Orb ─────────────────────
+                // Large central Siri-style Voice Orb
                 SiriVoiceOrb(
                     state = voiceState,
                     rmsDb = rmsDb,
-                    orbSize = 240.dp,
+                    orbSize = 250.dp,
                     onClick = {
                         when (voiceState) {
                             VoiceState.LISTENING -> voiceManager?.stopListening()
@@ -226,59 +175,28 @@ fun VoiceHomeScreen(
                     }
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(28.dp))
 
-                // State label
+                // Voice state indication
                 Text(
                     text = stateLabel,
                     color = stateColor,
-                    fontSize = 14.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
                     letterSpacing = 0.5.sp
                 )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // ── Speech / Response Floating Card ──────────────────
-                AnimatedVisibility(
-                    visible = showCard,
-                    enter = fadeIn() + slideInVertically { it / 3 },
-                    exit = fadeOut() + slideOutVertically { it / 3 }
-                ) {
-                    Surface(
-                        color = Color(0xFF131722),
-                        shape = RoundedCornerShape(16.dp),
-                        border = BorderStroke(1.dp, Color(0xFF202738)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .width(3.dp)
-                                    .height(34.dp)
-                                    .background(
-                                        stateColor,
-                                        RoundedCornerShape(2.dp)
-                                    )
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                text = cardText ?: "",
-                                color = TextPrimary,
-                                fontSize = 13.sp,
-                                lineHeight = 19.sp,
-                                maxLines = 4,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
             }
+
+            // ── Movie Subtitle / Live Spoken Interaction ─────────────
+            VoiceSubtitle(
+                voiceState = voiceState,
+                userSpeech = partialText,
+                aiResponse = lastAiMessage?.content,
+                errorMessage = errorMessage,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 20.dp)
+            )
         }
     }
 }
