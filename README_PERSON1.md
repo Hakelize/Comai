@@ -1,4 +1,4 @@
-# LIFELOOP — Person 1 Module Summary (Context Engine)
+# COMAI — Person 1 Module Summary (Context Engine)
 
 ## 📌 Module Scope & Deliverables
 This module (`com.comai.contextengine`) provides the native Android background architecture, context sensing, Room databases, rule escalation engine, and shared contract serializer for Person 1 in Sprint 1.

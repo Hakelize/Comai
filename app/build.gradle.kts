@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.lifeloop.comai"
+    namespace = "com.comai"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.lifeloop.comai"
+        applicationId = "com.comai"
         minSdk = 29
         targetSdk = 34
         versionCode = 1

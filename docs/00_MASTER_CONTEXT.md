@@ -1,4 +1,4 @@
-# LIFELOOP — Master Project Context (v2)
+# COMAI — Master Project Context (v2)
 _Updated with refined tech stack and team assignments._
 
 ## Project Constraints
@@ -13,7 +13,7 @@ _Updated with refined tech stack and team assignments._
 - Voice output: Android TTS
 
 ## Product One-Liner
-LIFELOOP is a privacy-first, voice-driven AI companion that understands a user's daily context
+Comai is a privacy-first, voice-driven AI companion that understands a user's daily context
 (time, location, routine) and proactively assists — without needing the user to explain themselves
 every time.
 

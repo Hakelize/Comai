@@ -17,9 +17,10 @@ import kotlinx.coroutines.launch
         UserProfile::class,
         DailyLog::class,
         Program::class,
-        PersonalizationState::class
+        PersonalizationState::class,
+        Memory::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class ComaiDatabase : RoomDatabase() {
@@ -28,12 +29,32 @@ abstract class ComaiDatabase : RoomDatabase() {
     abstract fun dailyLogDao(): DailyLogDao
     abstract fun programDao(): ProgramDao
     abstract fun personalizationStateDao(): PersonalizationStateDao
+    abstract fun memoryDao(): MemoryDao
 
     companion object {
         const val DATABASE_NAME = "comai_core_db"
 
         @Volatile
         private var INSTANCE: ComaiDatabase? = null
+
+        val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `memories` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `type` TEXT NOT NULL,
+                        `key` TEXT NOT NULL,
+                        `value` TEXT NOT NULL,
+                        `timestampMs` INTEGER NOT NULL,
+                        `source` TEXT NOT NULL,
+                        `confidence` REAL NOT NULL,
+                        `isUserDeletable` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
 
         fun getInstance(context: Context): ComaiDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -42,6 +63,7 @@ abstract class ComaiDatabase : RoomDatabase() {
                     ComaiDatabase::class.java,
                     DATABASE_NAME
                 )
+                    .addMigrations(MIGRATION_1_2)
                     .fallbackToDestructiveMigration()
                     .addCallback(DatabaseCallback(context))
                     .build()

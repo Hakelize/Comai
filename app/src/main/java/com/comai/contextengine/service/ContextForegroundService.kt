@@ -14,13 +14,25 @@ import androidx.core.app.NotificationCompat
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.comai.contextengine.context.ActivityRecognitionManager
+import com.comai.contextengine.contract.ContractAssembler
+import com.comai.contextengine.contract.ContractValidator
 import com.comai.contextengine.contract.SharedContextContract
+import com.comai.contextengine.rules.RuleEngine
+import com.comai.contextengine.rules.RuleEvaluationInput
+import com.comai.contextengine.rules.RuleEvaluationResult
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 class ContextForegroundService : Service() {
 
     private val binder = LocalBinder()
     private val outputListeners = mutableListOf<ContextOutputListener>()
+
+    val ruleEngine = RuleEngine()
+    val activityManager by lazy { ActivityRecognitionManager(this) }
 
     inner class LocalBinder : Binder() {
         fun getService(): ContextForegroundService = this@ContextForegroundService
@@ -31,13 +43,76 @@ class ContextForegroundService : Service() {
         Log.i(TAG, "ContextForegroundService creating...")
         startAsForeground()
         scheduleWorkManagerFallback()
+        ruleEngine.loadDefaultMvpRules()
+        activityManager.startMonitoring()
+
+        (application as? com.comai.ComaiApplication)?.contextBridge?.let { bridge ->
+            registerOutputListener(bridge)
+            Log.i(TAG, "Successfully auto-registered ContextBridge with ContextForegroundService")
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(TAG, "ContextForegroundService started with START_STICKY")
         startAsForeground()
         scheduleWorkManagerFallback()
+
+        if (intent?.action == ACTION_TRIGGER_EVALUATION) {
+            val time = intent.getStringExtra(EXTRA_TIME) ?: "18:43"
+            val location = intent.getStringExtra(EXTRA_LOCATION) ?: "Office"
+            val departure = intent.getStringExtra(EXTRA_DEPARTURE_TIME) ?: "17:30"
+            val isWork = intent.getBooleanExtra(EXTRA_IS_WORKDAY, true)
+
+            Log.i(TAG, "Received trigger action for time: $time at $location")
+            val customInput = RuleEvaluationInput(
+                currentTime = time,
+                currentLocation = location,
+                historicalOfficeDepartureTime = departure,
+                isWorkDay = isWork
+            )
+            evaluateAndEscalate(customInput)
+        }
+
         return START_STICKY
+    }
+
+    /**
+     * Executes the Context Engine evaluation pipeline:
+     * 1. Senses or accepts context input.
+     * 2. Evaluates rules with [RuleEngine].
+     * 3. Validates and packages [SharedContextContract].
+     * 4. Escalates context via [emitEscalatedContext].
+     */
+    fun evaluateAndEscalate(input: RuleEvaluationInput? = null): RuleEvaluationResult? {
+        val userState = activityManager.getCurrentUserState()
+        val evaluationInput = input ?: run {
+            val sdfTime = SimpleDateFormat("HH:mm", Locale.getDefault())
+            val sdfDay = SimpleDateFormat("EEEE", Locale.US)
+            val now = Date()
+            val timeStr = sdfTime.format(now)
+            val dayStr = sdfDay.format(now).uppercase(Locale.US)
+            val isWork = dayStr !in listOf("SATURDAY", "SUNDAY")
+            RuleEvaluationInput(
+                currentTime = timeStr,
+                dayOfWeek = dayStr,
+                isWorkDay = isWork,
+                currentLocation = "Office",
+                wakeTime = activityManager.detector.getFormattedWakeTime()
+            )
+        }
+
+        Log.d(TAG, "Context generated: time=${evaluationInput.currentTime}, location=${evaluationInput.currentLocation}")
+
+        val ruleResult = ruleEngine.evaluate(evaluationInput)
+        if (ruleResult != null) {
+            Log.i(TAG, "Rule triggered: ${ruleResult.triggeredRule.name}, task: ${ruleResult.task}")
+            val (contract, jsonOutput) = ContractAssembler.assemble(ruleResult, userState)
+            ContractValidator.validate(contract)
+            emitEscalatedContext(jsonOutput, contract)
+        } else {
+            Log.d(TAG, "No rule triggered for context at ${evaluationInput.currentTime}")
+        }
+        return ruleResult
     }
 
     override fun onBind(intent: Intent?): IBinder = binder
@@ -112,6 +187,9 @@ class ContextForegroundService : Service() {
     }
 
     override fun onDestroy() {
+        (application as? com.comai.ComaiApplication)?.contextBridge?.let { bridge ->
+            unregisterOutputListener(bridge)
+        }
         super.onDestroy()
         Log.w(TAG, "ContextForegroundService destroyed. Attempting quick restart...")
     }
@@ -121,5 +199,11 @@ class ContextForegroundService : Service() {
         const val CHANNEL_ID = "comai_context_channel"
         const val NOTIFICATION_ID = 1001
         const val WORKER_INTERVAL_MINUTES = 15L
+
+        const val ACTION_TRIGGER_EVALUATION = "com.comai.action.TRIGGER_CONTEXT_EVALUATION"
+        const val EXTRA_TIME = "extra_time"
+        const val EXTRA_LOCATION = "extra_location"
+        const val EXTRA_DEPARTURE_TIME = "extra_departure_time"
+        const val EXTRA_IS_WORKDAY = "extra_is_workday"
     }
 }
