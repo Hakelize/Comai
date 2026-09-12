@@ -14,13 +14,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material.icons.outlined.Assignment
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -50,6 +52,7 @@ import java.util.*
 fun ChatScreen(
     viewModel: ChatViewModel,
     voiceManager: VoiceInteractionManager? = null,
+    onBack: (() -> Unit)? = null,
     onNavigateToAudio: () -> Unit,
     onNavigateToDashboard: () -> Unit,
     onNavigateToMemory: () -> Unit = {}
@@ -71,11 +74,23 @@ fun ChatScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = DarkBackground
                 ),
+                navigationIcon = {
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = TextPrimary
+                            )
+                        }
+                    }
+                },
                 title = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -90,7 +105,7 @@ fun ChatScreen(
                             contentDescription = "Comai Avatar",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .size(42.dp)
+                                .size(40.dp)
                                 .clip(CircleShape)
                         )
 
@@ -101,7 +116,7 @@ fun ChatScreen(
                                 text = "Comai",
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 17.sp
+                                fontSize = 16.sp
                             )
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(
@@ -112,9 +127,9 @@ fun ChatScreen(
                                 )
                                 Spacer(modifier = Modifier.width(5.dp))
                                 Text(
-                                    text = "Online",
+                                    text = "Ready",
                                     color = OnlineGreen,
-                                    fontSize = 12.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium
                                 )
                             }
@@ -123,7 +138,12 @@ fun ChatScreen(
                 },
                 actions = {
                     IconButton(onClick = onNavigateToMemory) {
-                        Text("🧠", fontSize = 18.sp)
+                        Icon(
+                            imageVector = Icons.Outlined.Psychology,
+                            contentDescription = "Memories",
+                            tint = SoftPurple,
+                            modifier = Modifier.size(22.dp)
+                        )
                     }
                     IconButton(onClick = onNavigateToAudio) {
                         Icon(
@@ -144,7 +164,11 @@ fun ChatScreen(
         },
         containerColor = DarkBackground,
         bottomBar = {
-            Column {
+            Column(
+                modifier = Modifier
+                    .navigationBarsPadding()
+                    .imePadding()
+            ) {
                 AnimatedVisibility(visible = voiceState != VoiceState.IDLE) {
                     Surface(
                         color = when (voiceState) {
@@ -162,12 +186,30 @@ fun ChatScreen(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Icon(
+                                imageVector = when (voiceState) {
+                                    VoiceState.LISTENING -> Icons.Default.Mic
+                                    VoiceState.PROCESSING -> Icons.Outlined.Sync
+                                    VoiceState.SPEAKING -> Icons.Outlined.GraphicEq
+                                    VoiceState.ERROR -> Icons.Default.MicOff
+                                    else -> Icons.Default.Mic
+                                },
+                                contentDescription = null,
+                                tint = when (voiceState) {
+                                    VoiceState.LISTENING -> OnlineGreen
+                                    VoiceState.PROCESSING -> WarmAmber
+                                    VoiceState.SPEAKING -> ElectricTeal
+                                    else -> Color.White
+                                },
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = when (voiceState) {
-                                    VoiceState.LISTENING -> "🎤 Listening: ${partialText.ifBlank { "Speak now..." }}"
-                                    VoiceState.PROCESSING -> "⏳ Processing speech..."
-                                    VoiceState.SPEAKING -> "🔊 Speaking... (Tap mic to stop)"
-                                    VoiceState.ERROR -> "⚠️ Speech recognition error"
+                                    VoiceState.LISTENING -> "Listening: ${partialText.ifBlank { "Speak now..." }}"
+                                    VoiceState.PROCESSING -> "Processing speech..."
+                                    VoiceState.SPEAKING -> "Speaking... (Tap mic to stop)"
+                                    VoiceState.ERROR -> "Speech recognition error"
                                     else -> ""
                                 },
                                 color = when (voiceState) {
@@ -317,7 +359,6 @@ fun ChatInputBar(
         color = DarkBackground,
         modifier = Modifier
             .fillMaxWidth()
-            .imePadding()
     ) {
         Row(
             modifier = Modifier

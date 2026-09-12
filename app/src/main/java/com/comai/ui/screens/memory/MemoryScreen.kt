@@ -4,30 +4,40 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.comai.contextengine.db.Memory
+import com.comai.ui.components.ComaiBottomBar
+import com.comai.ui.navigation.Routes
 import com.comai.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MemoryScreen(
     viewModel: MemoryViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToHome: () -> Unit = {},
+    onNavigateToChat: () -> Unit = {},
+    onNavigateToRoutine: () -> Unit = {},
+    onNavigateToProfile: () -> Unit = {}
 ) {
     val memories by viewModel.memories.collectAsState()
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = { Text("Memory & Privacy", color = Color.White, fontSize = 18.sp) },
@@ -43,13 +53,28 @@ fun MemoryScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkBackground)
             )
         },
+        bottomBar = {
+            Column(modifier = Modifier.navigationBarsPadding()) {
+                ComaiBottomBar(
+                    currentRoute = Routes.MEMORY,
+                    onNavigate = { targetRoute ->
+                        when (targetRoute) {
+                            Routes.HOME -> onNavigateToHome()
+                            Routes.CHAT -> onNavigateToChat()
+                            Routes.ROUTINE -> onNavigateToRoutine()
+                            Routes.PROFILE -> onNavigateToProfile()
+                        }
+                    }
+                )
+            }
+        },
         containerColor = DarkBackground
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
             Text(
                 text = "Comai Remembers",
@@ -82,7 +107,20 @@ fun MemoryScreen(
                             modifier = Modifier.padding(24.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text("🧠", fontSize = 36.sp)
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF161E2E)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Lightbulb,
+                                    contentDescription = null,
+                                    tint = SoftPurple,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
                                 "No memories saved yet",
