@@ -7,6 +7,8 @@ import com.comai.engine.AIEngine
 import com.comai.engine.models.ContextInput
 import com.comai.engine.models.ContextSignals
 import com.comai.tts.TTSManager
+import com.comai.voice.ComaiLanguage
+import com.comai.voice.TextNormalizer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,7 +21,8 @@ class ChatViewModel(
     private val aiEngine: AIEngine,
     private val ttsManager: TTSManager,
     private val contextBridge: com.comai.context.ContextBridge? = null,
-    private val memoryRepository: com.comai.memory.MemoryRepository? = null
+    private val memoryRepository: com.comai.memory.MemoryRepository? = null,
+    private val textNormalizer: TextNormalizer = TextNormalizer()
 ) : ViewModel() {
 
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
@@ -27,6 +30,14 @@ class ChatViewModel(
 
     private val _isTyping = MutableStateFlow(false)
     val isTyping: StateFlow<Boolean> = _isTyping.asStateFlow()
+
+    /** Current language for text normalization. Updated from VoiceHomeScreen. */
+    private var currentLanguage: ComaiLanguage = ComaiLanguage.ENGLISH
+
+    fun setLanguage(language: ComaiLanguage) {
+        currentLanguage = language
+        android.util.Log.i("ChatViewModel", "LANGUAGE_SET: ${language.name}")
+    }
 
     private val _currentContext = MutableStateFlow(
         ContextInput(
@@ -94,10 +105,10 @@ class ChatViewModel(
                 )
 
                 val input = _currentContext.value.copy(
-                    task = text,
+                    task = textNormalizer.normalize(text, currentLanguage),
                     retrievedData = retrievedData
                 )
-                android.util.Log.i("ChatViewModel", "TEXT_SUBMITTED: length=${text.length}")
+                android.util.Log.i("ChatViewModel", "TEXT_SUBMITTED: length=${text.length}, lang=${currentLanguage.name}")
                 android.util.Log.i("ChatViewModel", "AI_PROCESSING: task=${input.task}, hasRetrievedData=${retrievedData != null}")
                 val response = aiEngine.process(input)
                 android.util.Log.i("ChatViewModel", "AI_RESPONSE: action=${response.action}")

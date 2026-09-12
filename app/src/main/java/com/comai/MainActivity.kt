@@ -17,8 +17,11 @@ import com.comai.ui.screens.audio.AudioViewModel
 import com.comai.ui.screens.capability.CapabilityViewModel
 import com.comai.ui.screens.chat.ChatViewModel
 import com.comai.ui.screens.dashboard.DashboardViewModel
+import com.comai.ui.screens.home.HomeViewModel
 import com.comai.ui.screens.memory.MemoryViewModel
 import com.comai.ui.theme.ComaiTheme
+import com.comai.voice.LanguagePreferences
+import com.comai.voice.TextNormalizer
 import com.comai.voice.VoiceInteractionManager
 import kotlinx.coroutines.launch
 
@@ -53,13 +56,21 @@ class MainActivity : ComponentActivity() {
             startService(serviceIntent)
         }
 
+        // Multilingual support
+        val textNormalizer = TextNormalizer()
+        val languagePrefs = LanguagePreferences(this)
+        val savedLanguage = languagePrefs.getLanguage()
+
         // Factory to supply custom dependencies to ViewModels
         val chatViewModel = ViewModelProvider(this, object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return ChatViewModel(aiEngine, ttsManager, contextBridge, memoryRepository) as T
+                return ChatViewModel(aiEngine, ttsManager, contextBridge, memoryRepository, textNormalizer) as T
             }
         })[ChatViewModel::class.java]
+
+        // Restore saved language into ChatViewModel
+        chatViewModel.setLanguage(savedLanguage)
 
         val audioViewModel = ViewModelProvider(this, object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -104,20 +115,56 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // Restore saved language into voiceManager and ttsManager
+        voiceManager.setLanguage(savedLanguage)
+        ttsManager.setLanguage(savedLanguage.ttsLocale)
+
         this.chatViewModel = chatViewModel
         this.voiceInteractionManager = voiceManager
 
         handleEvaluationIntent(intent)
 
+        // Onboarding and User Profile preferences
+        val onboardingPreferences = com.comai.ui.screens.onboarding.OnboardingPreferences(this)
+        val userProfileDao = (application as ComaiApplication).database.userProfileDao()
+        val onboardingViewModel = ViewModelProvider(this, object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
+                return com.comai.ui.screens.onboarding.OnboardingViewModel(onboardingPreferences, userProfileDao) as T
+            }
+        })[com.comai.ui.screens.onboarding.OnboardingViewModel::class.java]
+
+        val homeViewModel = ViewModelProvider(this, object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
+                return HomeViewModel(onboardingPreferences) as T
+            }
+        })[HomeViewModel::class.java]
+
+        val startDestination = if (onboardingPreferences.isOnboardingCompleted()) {
+            com.comai.ui.navigation.Routes.HOME
+        } else {
+            com.comai.ui.navigation.Routes.ONBOARDING
+        }
+
         setContent {
             ComaiTheme {
                 ComaiNavGraph(
+                    startDestination = startDestination,
+                    homeViewModel = homeViewModel,
                     chatViewModel = chatViewModel,
                     audioViewModel = audioViewModel,
                     dashboardViewModel = dashboardViewModel,
                     memoryViewModel = memoryViewModel,
                     capabilityViewModel = capabilityViewModel,
-                    voiceManager = voiceManager
+                    onboardingViewModel = onboardingViewModel,
+                    voiceManager = voiceManager,
+                    onLanguageChanged = { lang ->
+                        voiceManager.setLanguage(lang)
+                        ttsManager.setLanguage(lang.ttsLocale)
+                        chatViewModel.setLanguage(lang)
+                        languagePrefs.setLanguage(lang)
+                    }
                 )
             }
         }

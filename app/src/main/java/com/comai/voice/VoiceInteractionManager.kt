@@ -58,10 +58,23 @@ class VoiceInteractionManager(
     private val _partialText = MutableStateFlow("")
     val partialText: StateFlow<String> = _partialText.asStateFlow()
 
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    private val _language = MutableStateFlow(ComaiLanguage.ENGLISH)
+    val language: StateFlow<ComaiLanguage> = _language.asStateFlow()
+
     private var speechRecognizer: SpeechRecognizer? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
     var onPermissionRequired: (() -> Unit)? = null
+
+    /** Update the STT language. Takes effect on the next startListening() call. */
+    fun setLanguage(lang: ComaiLanguage) {
+        _language.value = lang
+        _errorMessage.value = null
+        Log.i(TAG, "LANGUAGE_SET: ${lang.name} (stt=${lang.sttTag})")
+    }
 
     init {
         scope.launch {
@@ -85,17 +98,6 @@ class VoiceInteractionManager(
     }
 
     /**
-     * Checks whether offline/on-device recognition is supported (API 31+).
-     */
-    fun isOnDeviceAvailable(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
-        } else {
-            false
-        }
-    }
-
-    /**
      * Single-tap start listening handler.
      * Prevents duplicate recognizers or multiple starts.
      */
@@ -108,6 +110,9 @@ class VoiceInteractionManager(
             return
         }
 
+        // Clear previous error
+        _errorMessage.value = null
+
         // 2. Permission check
         val hasPermission = ContextCompat.checkSelfPermission(
             context,
@@ -117,8 +122,9 @@ class VoiceInteractionManager(
         if (!hasPermission) {
             Log.w(TAG, "MIC_PERMISSION_DENIED")
             _state.value = VoiceState.ERROR
+            _errorMessage.value = "Microphone permission denied. Please grant permission."
             onPermissionRequired?.invoke()
-            mainHandler.postDelayed({ _state.value = VoiceState.IDLE }, 1500)
+            mainHandler.postDelayed({ _state.value = VoiceState.IDLE }, 2000)
             return
         }
 
@@ -127,33 +133,42 @@ class VoiceInteractionManager(
         // 3. Audio feedback prevention: Stop any ongoing TTS immediately
         ttsManager.stop()
 
-        // 4. Create SpeechRecognizer instance (prefer on-device if available)
+        // 4. Create standard SpeechRecognizer instance (supports Google Speech Services online & offline)
         destroyRecognizer()
 
-        val onDevice = isOnDeviceAvailable()
-        speechRecognizer = if (onDevice && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            Log.i(TAG, "SPEECH_RECOGNIZER_CREATED: On-Device SpeechRecognizer (API 31+)")
-            SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
-        } else {
-            Log.i(TAG, "SPEECH_RECOGNIZER_CREATED: Standard Android SpeechRecognizer")
-            SpeechRecognizer.createSpeechRecognizer(context)
+        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+            Log.e(TAG, "SPEECH_ERROR: Speech recognition service not available on device")
+            _state.value = VoiceState.ERROR
+            _errorMessage.value = "Speech recognition service not available on this device."
+            mainHandler.postDelayed({ _state.value = VoiceState.IDLE }, 2500)
+            return
         }
 
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
+
         if (speechRecognizer == null) {
-            Log.e(TAG, "SPEECH_ERROR: SpeechRecognizer instance creation failed")
+            Log.e(TAG, "SPEECH_ERROR: SpeechRecognizer instance creation returned null")
             _state.value = VoiceState.ERROR
-            mainHandler.postDelayed({ _state.value = VoiceState.IDLE }, 1500)
+            _errorMessage.value = "Speech recognizer initialization failed. Tap orb to retry."
+            mainHandler.postDelayed({ _state.value = VoiceState.IDLE }, 2000)
             return
         }
 
         speechRecognizer?.setRecognitionListener(createRecognitionListener())
 
+        val lang = _language.value
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang.sttTag)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, lang.sttTag)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
+            if (lang.altLocales.isNotEmpty()) {
+                putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", lang.altLocales.toTypedArray())
+            }
         }
+        Log.i(TAG, "STT_LOCALE: ${lang.sttTag} (alt=${lang.altLocales})")
 
         Log.i(TAG, "MIC_STARTED")
         Log.i(TAG, "LISTENING_STARTED")
@@ -166,8 +181,9 @@ class VoiceInteractionManager(
             } catch (e: Exception) {
                 Log.e(TAG, "SPEECH_ERROR: startListening exception: ${e.message}")
                 _state.value = VoiceState.ERROR
+                _errorMessage.value = "Failed to start speech capture: ${e.message}"
                 destroyRecognizer()
-                mainHandler.postDelayed({ _state.value = VoiceState.IDLE }, 1500)
+                mainHandler.postDelayed({ _state.value = VoiceState.IDLE }, 2000)
             }
         }
     }
@@ -191,6 +207,7 @@ class VoiceInteractionManager(
         destroyRecognizer()
         _state.value = VoiceState.IDLE
         _partialText.value = ""
+        _errorMessage.value = null
     }
 
     private fun destroyRecognizer() {
@@ -224,26 +241,38 @@ class VoiceInteractionManager(
         }
 
         override fun onError(error: Int) {
-            val errorMsg = when (error) {
-                SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
-                SpeechRecognizer.ERROR_CLIENT -> "Client-side error"
-                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Insufficient permissions"
-                SpeechRecognizer.ERROR_NETWORK -> "Network error"
-                SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
-                SpeechRecognizer.ERROR_NO_MATCH -> "No speech match"
-                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer busy"
-                SpeechRecognizer.ERROR_SERVER -> "Server error"
-                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Speech timeout (silence)"
-                else -> "Error code: $error"
+            val currentLang = _language.value
+            val (errorMsg, isFatal) = when (error) {
+                SpeechRecognizer.ERROR_AUDIO -> "Audio recording error (Code 3)" to true
+                SpeechRecognizer.ERROR_CLIENT -> "Client error (Code 5)" to true
+                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission required (Code 9)" to true
+                SpeechRecognizer.ERROR_NETWORK -> "Network error (Code 2)" to true
+                SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout (Code 1)" to true
+                SpeechRecognizer.ERROR_NO_MATCH -> "No speech match (Code 7)" to false
+                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer busy (Code 8)" to true
+                SpeechRecognizer.ERROR_SERVER -> "Server error (Code 4)" to true
+                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Speech timeout / silence (Code 6)" to false
+                10 -> "Too many requests (Code 10)" to true
+                11 -> "Server disconnected (Code 11)" to true
+                12 -> "Language not supported on device: ${currentLang.displayName} (Code 12)" to true
+                13 -> "Language unavailable: ${currentLang.displayName} (Code 13)" to true
+                14 -> "Cannot check language support (Code 14)" to true
+                else -> "Speech error: Code $error" to true
             }
             Log.w(TAG, "SPEECH_ERROR: $errorMsg ($error)")
 
-            if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+            if (!isFatal) {
                 Log.i(TAG, "NO_MATCH: No speech detected or timeout")
                 _state.value = VoiceState.IDLE
+                _errorMessage.value = null
             } else {
                 _state.value = VoiceState.ERROR
-                mainHandler.postDelayed({ _state.value = VoiceState.IDLE }, 1500)
+                _errorMessage.value = "$errorMsg. Tap orb to retry."
+                mainHandler.postDelayed({
+                    if (_state.value == VoiceState.ERROR) {
+                        _state.value = VoiceState.IDLE
+                    }
+                }, 3000)
             }
 
             destroyRecognizer()
@@ -258,6 +287,7 @@ class VoiceInteractionManager(
             if (!recognizedText.isNullOrBlank()) {
                 Log.i(TAG, "FINAL_RESULT: length=${recognizedText.length}")
                 _state.value = VoiceState.PROCESSING
+                _errorMessage.value = null
                 Log.i(TAG, "TEXT_SUBMITTED")
                 onSpeechRecognized(recognizedText)
             } else {
