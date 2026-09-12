@@ -24,7 +24,8 @@ fun DashboardScreen(
     viewModel: DashboardViewModel,
     onBackToChat: () -> Unit,
     onNavigateToMemory: () -> Unit = {},
-    onNavigateToCapability: () -> Unit = {}
+    onNavigateToCapability: () -> Unit = {},
+    onNavigateToRamDashboard: () -> Unit = {}
 ) {
     val selectedTime by viewModel.selectedTime.collectAsState()
     val selectedLocation by viewModel.selectedLocation.collectAsState()
@@ -127,8 +128,17 @@ fun DashboardScreen(
                 )
             }
 
-            // MVP Demo Scenario Quick-Fire Buttons
-            Text("One-Tap Demo Story Scenarios", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            // Technical Dashboards & Scenarios
+            Text("Developer Technical Tools & Scenarios", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+
+            Button(
+                onClick = onNavigateToRamDashboard,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = ElectricTeal),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("📍 Person 1 — RAM Context Pipeline Dashboard", color = Color.Black, fontWeight = FontWeight.Bold)
+            }
 
             Button(
                 onClick = onNavigateToMemory,
@@ -142,10 +152,10 @@ fun DashboardScreen(
             Button(
                 onClick = onNavigateToCapability,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = ElectricTeal.copy(alpha = 0.85f)),
+                colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceVariant),
                 shape = RoundedCornerShape(10.dp)
             ) {
-                Text("📊 Device Capability & Security Audit", color = Color.Black, fontWeight = FontWeight.Bold)
+                Text("📊 Device Capability & Security Audit", color = Color.White, fontWeight = FontWeight.Bold)
             }
 
             val scenarios = listOf(

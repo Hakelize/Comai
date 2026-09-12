@@ -6,6 +6,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
+import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "routine_program")
 data class Program(
@@ -25,6 +26,9 @@ interface ProgramDao {
 
     @Query("SELECT * FROM routine_program")
     suspend fun getAllPrograms(): List<Program>
+
+    @Query("SELECT * FROM routine_program")
+    fun getAllProgramsFlow(): Flow<List<Program>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdateProgram(program: Program)
