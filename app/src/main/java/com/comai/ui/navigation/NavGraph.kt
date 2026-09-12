@@ -86,8 +86,7 @@ fun ComaiNavGraph(
                 onNavigateToRoutine = { navController.navigate(Routes.ROUTINE) },
                 onNavigateToProfile = { navController.navigate(Routes.PROFILE) },
                 onNavigateToMemory = { navController.navigate(Routes.MEMORY) },
-                onNavigateToDashboard = { navController.navigate(Routes.DASHBOARD) },
-                onLanguageChanged = onLanguageChanged
+                onNavigateToDashboard = { navController.navigate(Routes.DASHBOARD) }
             )
         }
 
