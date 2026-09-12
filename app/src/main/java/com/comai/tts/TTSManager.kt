@@ -17,6 +17,7 @@ open class TTSManager(context: Context? = null) {
 
     private var tts: TextToSpeech? = null
     private var isInitialized = false
+    private var targetLocale: Locale = Locale.US
 
     private val _isSpeaking = MutableStateFlow(false)
     val isSpeaking: StateFlow<Boolean> = _isSpeaking.asStateFlow()
@@ -41,43 +42,39 @@ open class TTSManager(context: Context? = null) {
     init {
         context?.applicationContext?.let { appContext ->
             tts = TextToSpeech(appContext) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                tts?.let { engine ->
-                    val result = engine.setLanguage(Locale.US)
-                    if (result != TextToSpeech.LANG_MISSING_DATA &&
-                        result != TextToSpeech.LANG_NOT_SUPPORTED
-                    ) {
+                if (status == TextToSpeech.SUCCESS) {
+                    tts?.let { engine ->
                         isInitialized = true
                         _isReady.value = true
+                        applyLanguage(targetLocale)
                         engine.setSpeechRate(speechRate)
                         engine.setPitch(pitch)
                     }
                 }
             }
-        }
 
-        tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(utteranceId: String?) {
-                _isSpeaking.value = true
-                android.util.Log.i("TTSManager", "TTS_STARTED: utteranceId=$utteranceId")
-            }
+            tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) {
+                    _isSpeaking.value = true
+                    android.util.Log.i("TTSManager", "TTS_STARTED: utteranceId=$utteranceId")
+                }
 
-            override fun onDone(utteranceId: String?) {
-                _isSpeaking.value = false
-                android.util.Log.i("TTSManager", "TTS_COMPLETED: utteranceId=$utteranceId")
-            }
+                override fun onDone(utteranceId: String?) {
+                    _isSpeaking.value = false
+                    android.util.Log.i("TTSManager", "TTS_COMPLETED: utteranceId=$utteranceId")
+                }
 
-            @Deprecated("Deprecated in Java")
-            override fun onError(utteranceId: String?) {
-                _isSpeaking.value = false
-                android.util.Log.w("TTSManager", "TTS_ERROR: utteranceId=$utteranceId")
-            }
+                @Deprecated("Deprecated in Java")
+                override fun onError(utteranceId: String?) {
+                    _isSpeaking.value = false
+                    android.util.Log.w("TTSManager", "TTS_ERROR: utteranceId=$utteranceId")
+                }
 
-            override fun onError(utteranceId: String?, errorCode: Int) {
-                _isSpeaking.value = false
-                android.util.Log.w("TTSManager", "TTS_ERROR: utteranceId=$utteranceId, errorCode=$errorCode")
-            }
-        })
+                override fun onError(utteranceId: String?, errorCode: Int) {
+                    _isSpeaking.value = false
+                    android.util.Log.w("TTSManager", "TTS_ERROR: utteranceId=$utteranceId, errorCode=$errorCode")
+                }
+            })
         }
     }
 
@@ -102,6 +99,34 @@ open class TTSManager(context: Context? = null) {
             success
         } catch (e: Exception) {
             android.util.Log.w("TTSManager", "TTS failure: exception during speech synthesis: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Switch the TTS output language.
+     * If TTS is not yet initialized, caches [locale] to apply upon init completion.
+     * Checks availability first; falls back to Locale.US if [locale] is unsupported.
+     * @return true if the requested locale was set, false if fallback was used or initialization is pending.
+     */
+    open fun setLanguage(locale: Locale): Boolean {
+        targetLocale = locale
+        if (!isInitialized) {
+            return false
+        }
+        return applyLanguage(locale)
+    }
+
+    private fun applyLanguage(locale: Locale): Boolean {
+        val engine = tts ?: return false
+        val availability = engine.isLanguageAvailable(locale)
+        return if (availability >= TextToSpeech.LANG_AVAILABLE) {
+            engine.setLanguage(locale)
+            android.util.Log.i("TTSManager", "TTS_LANGUAGE_SET: ${locale.toLanguageTag()}")
+            true
+        } else {
+            android.util.Log.w("TTSManager", "TTS_LANGUAGE_UNAVAILABLE: ${locale.toLanguageTag()} (code=$availability), falling back to en-US")
+            engine.setLanguage(Locale.US)
             false
         }
     }

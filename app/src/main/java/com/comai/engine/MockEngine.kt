@@ -85,7 +85,7 @@ class MockEngine : AIEngine {
             // --- Tribe Finder events ---
             task.contains("tribe") || task.contains("event") ||
             task.contains("community") || task.contains("club") ||
-            task.contains("meetup") || task.contains("run") ->
+            task.contains("meetup") || task.contains("running") || task.contains(" run") || task.contains("run ") || task == "run" ->
                 AIResponse(
                     action = "tribe_event",
                     speech = "There's a running club meetup near your office at 6 PM today. 14 people have already signed up. Want me to set a reminder?",
