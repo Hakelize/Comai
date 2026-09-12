@@ -7,6 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Update
+import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "user_profile")
 data class UserProfile(
@@ -23,6 +24,9 @@ data class UserProfile(
 
 @Dao
 interface UserProfileDao {
+    @Query("SELECT * FROM user_profile WHERE id = 1 LIMIT 1")
+    fun getUserProfileFlow(): Flow<UserProfile?>
+
     @Query("SELECT * FROM user_profile WHERE id = 1 LIMIT 1")
     suspend fun getUserProfile(): UserProfile?
 

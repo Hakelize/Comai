@@ -27,6 +27,11 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 
+    <!-- Bluetooth & Audio -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
     <queries>
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
@@ -61,23 +66,23 @@
 
         <!-- Foreground Context Engine -->
         <service
-            android:name="com.comai.contextengine.service.ContextForegroundService"
+            android:name=".contextengine.service.ContextForegroundService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="specialUse|dataSync">
-
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Background context sensing engine for Comai adaptive routines" />
+                android:value="Proactive contextual background sensing and escalation rule engine for user lifecycle management." />
         </service>
 
-        <!-- Boot receiver -->
         <receiver
-            android:name="com.comai.contextengine.service.BootReceiver"
+            android:name=".contextengine.service.BootReceiver"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.USER_UNLOCKED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
