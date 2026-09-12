@@ -1,6 +1,7 @@
 package com.comai.ui.screens.home
 
 import androidx.lifecycle.ViewModel
+import com.comai.ui.components.HomeGreetingUtils
 import com.comai.ui.screens.onboarding.OnboardingPreferences
 import com.comai.ui.screens.onboarding.UserOnboardingProfile
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,14 +47,7 @@ class HomeViewModel(
             val minute = calendar.get(Calendar.MINUTE)
             val currentMinutes = hour * 60 + minute
 
-            val userName = profile.name.trim().ifBlank { "there" }
-
-            val timeOfDayGreeting = when {
-                hour < 12 -> "Good morning"
-                hour < 17 -> "Good afternoon"
-                else -> "Good evening"
-            }
-            val greeting = "$timeOfDayGreeting, $userName"
+            val greeting = HomeGreetingUtils.computeGreeting(profile.name, calendar)
 
             val wakeMinutes = parseTimeToMinutes(profile.wakeTime, default = 7 * 60)
             val leaveMinutes = parseTimeToMinutes(profile.leaveHomeTime, default = 8 * 60 + 30)

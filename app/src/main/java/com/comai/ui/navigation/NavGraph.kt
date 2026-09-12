@@ -21,6 +21,8 @@ import com.comai.ui.screens.onboarding.OnboardingScreen
 import com.comai.ui.screens.onboarding.OnboardingViewModel
 import com.comai.ui.screens.profile.ProfileScreen
 import com.comai.ui.screens.routine.RoutineScreen
+import com.comai.ui.screens.schedule.PersonalScheduleScreen
+import com.comai.ui.screens.schedule.PersonalScheduleViewModel
 import com.comai.voice.ComaiLanguage
 import com.comai.voice.VoiceInteractionManager
 
@@ -34,6 +36,7 @@ object Routes {
     const val DASHBOARD = "dashboard"
     const val MEMORY = "memory"
     const val CAPABILITY = "capability"
+    const val PERSONAL_SCHEDULE = "personal_schedule"
 }
 
 @Composable
@@ -46,6 +49,7 @@ fun ComaiNavGraph(
     dashboardViewModel: DashboardViewModel,
     memoryViewModel: MemoryViewModel,
     capabilityViewModel: CapabilityViewModel,
+    personalScheduleViewModel: PersonalScheduleViewModel? = null,
     onboardingViewModel: OnboardingViewModel? = null,
     voiceManager: VoiceInteractionManager? = null,
     onLanguageChanged: (ComaiLanguage) -> Unit = {}
@@ -78,8 +82,7 @@ fun ComaiNavGraph(
                 onNavigateToRoutine = { navController.navigate(Routes.ROUTINE) },
                 onNavigateToProfile = { navController.navigate(Routes.PROFILE) },
                 onNavigateToMemory = { navController.navigate(Routes.MEMORY) },
-                onNavigateToDashboard = { navController.navigate(Routes.DASHBOARD) },
-                onLanguageChanged = onLanguageChanged
+                onNavigateToDashboard = { navController.navigate(Routes.DASHBOARD) }
             )
         }
 
@@ -110,8 +113,24 @@ fun ComaiNavGraph(
                 onNavigateToHome = { navController.navigate(Routes.HOME) },
                 onNavigateToChat = { navController.navigate(Routes.CHAT) },
                 onNavigateToRoutine = { navController.navigate(Routes.ROUTINE) },
-                onNavigateToMemory = { navController.navigate(Routes.MEMORY) }
+                onNavigateToMemory = { navController.navigate(Routes.MEMORY) },
+                onNavigateToPersonalSchedule = { navController.navigate(Routes.PERSONAL_SCHEDULE) },
+                onLanguageChanged = onLanguageChanged
             )
+        }
+
+        composable(Routes.PERSONAL_SCHEDULE) {
+            if (personalScheduleViewModel != null) {
+                PersonalScheduleScreen(
+                    viewModel = personalScheduleViewModel,
+                    onBack = { navController.popBackStack() },
+                    onNavigateToHome = { navController.navigate(Routes.HOME) },
+                    onNavigateToChat = { navController.navigate(Routes.CHAT) },
+                    onNavigateToRoutine = { navController.navigate(Routes.ROUTINE) },
+                    onNavigateToMemory = { navController.navigate(Routes.MEMORY) },
+                    onNavigateToProfile = { navController.navigate(Routes.PROFILE) }
+                )
+            }
         }
 
         composable(Routes.AUDIO) {
