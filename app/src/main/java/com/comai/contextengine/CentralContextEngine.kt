@@ -48,7 +48,35 @@ class CentralContextEngine(
      */
     suspend fun processContext(): ContextProcessingResult {
         // 1. Collect normalized provider outputs
-        val deviceContext = provider.getContextData()
+        val rawContext = provider.getContextData()
+        val deviceContext = if (context != null) {
+            try {
+                val appUsageRepo = com.comai.digitalactivity.repository.AppUsageRepository(context)
+                if (appUsageRepo.isMonitoringEnabled() && appUsageRepo.hasUsagePermission()) {
+                    val snapshot = appUsageRepo.getDailyUsageSnapshot()
+                    val inferred = appUsageRepo.inferActivityState(snapshot)
+                    val digAct = com.comai.digitalactivity.model.DigitalActivityContextData(
+                        isAvailable = true,
+                        activityState = inferred.state.name,
+                        confidence = inferred.confidence,
+                        reason = inferred.reason,
+                        lastActivityTimestampMs = inferred.lastActivityTimestampMs,
+                        lastActivityFormatted = inferred.lastActivityFormatted,
+                        currentOrRecentApp = snapshot.recentForegroundApp,
+                        appCategory = snapshot.recentAppCategory.name,
+                        dailyScreenTimeMinutes = snapshot.totalScreenTimeMs / (1000 * 60),
+                        topUsedApp = snapshot.topUsedApp?.appName
+                    )
+                    rawContext.copy(digitalActivity = digAct)
+                } else {
+                    rawContext
+                }
+            } catch (_: Exception) {
+                rawContext
+            }
+        } else {
+            rawContext
+        }
 
         // 2. Remove duplicate / unnecessary info and determine broad context
         val userContext = determineUserContext(deviceContext)

@@ -6,6 +6,8 @@ import android.speech.tts.UtteranceProgressListener
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 import java.util.UUID
 
@@ -38,6 +40,8 @@ open class TTSManager(context: Context? = null) {
         }
 
     var enabled: Boolean = true
+    var onBeforeSpeak: (() -> Unit)? = null
+    private val utteranceCallbacks = java.util.concurrent.ConcurrentHashMap<String, () -> Unit>()
 
     init {
         context?.applicationContext?.let { appContext ->
@@ -62,43 +66,83 @@ open class TTSManager(context: Context? = null) {
                 override fun onDone(utteranceId: String?) {
                     _isSpeaking.value = false
                     android.util.Log.i("TTSManager", "TTS_COMPLETED: utteranceId=$utteranceId")
+                    if (utteranceId != null) {
+                        utteranceCallbacks.remove(utteranceId)?.invoke()
+                    }
                 }
 
                 @Deprecated("Deprecated in Java")
                 override fun onError(utteranceId: String?) {
                     _isSpeaking.value = false
                     android.util.Log.w("TTSManager", "TTS_ERROR: utteranceId=$utteranceId")
+                    if (utteranceId != null) {
+                        utteranceCallbacks.remove(utteranceId)?.invoke()
+                    }
                 }
 
                 override fun onError(utteranceId: String?, errorCode: Int) {
                     _isSpeaking.value = false
                     android.util.Log.w("TTSManager", "TTS_ERROR: utteranceId=$utteranceId, errorCode=$errorCode")
+                    if (utteranceId != null) {
+                        utteranceCallbacks.remove(utteranceId)?.invoke()
+                    }
                 }
             })
         }
     }
 
+    /**
+     * Suspends until the TTS engine is fully initialized and ready.
+     * Prevents race conditions on cold start.
+     */
+    suspend fun awaitReady(timeoutMs: Long = 2500L): Boolean {
+        if (isInitialized && _isReady.value) return true
+        return try {
+            withTimeoutOrNull(timeoutMs) {
+                _isReady.first { it }
+            } ?: (isInitialized && _isReady.value)
+        } catch (e: Exception) {
+            isInitialized && _isReady.value
+        }
+    }
+
     /** Speak the given text. Stops any currently playing utterance first. */
     open fun speak(text: String): Boolean {
+        return speak(text, onDone = null)
+    }
+
+    open fun speak(text: String, onDone: (() -> Unit)?): Boolean {
         if (!enabled || !isInitialized || text.isBlank()) {
             android.util.Log.d("TTSManager", "TTS skipped: enabled=$enabled, initialized=$isInitialized")
+            onDone?.invoke()
             return false
+        }
+        try {
+            onBeforeSpeak?.invoke()
+        } catch (e: Exception) {
+            android.util.Log.w("TTSManager", "onBeforeSpeak exception: ${e.message}")
         }
         return try {
             android.util.Log.i("TTSManager", "TTS started: length=${text.length}")
+            val utteranceId = UUID.randomUUID().toString()
+            if (onDone != null) {
+                utteranceCallbacks[utteranceId] = onDone
+            }
             val result = tts?.speak(
                 text,
                 TextToSpeech.QUEUE_FLUSH,
                 null,
-                UUID.randomUUID().toString()
+                utteranceId
             )
             val success = result == TextToSpeech.SUCCESS
             if (!success) {
                 android.util.Log.w("TTSManager", "TTS failure: queue returned $result")
+                utteranceCallbacks.remove(utteranceId)?.invoke()
             }
             success
         } catch (e: Exception) {
             android.util.Log.w("TTSManager", "TTS failure: exception during speech synthesis: ${e.message}")
+            onDone?.invoke()
             false
         }
     }
@@ -135,6 +179,7 @@ open class TTSManager(context: Context? = null) {
     open fun stop() {
         tts?.stop()
         _isSpeaking.value = false
+        utteranceCallbacks.clear()
     }
 
     /** Release TTS resources. Call this when the lifecycle owner is destroyed. */

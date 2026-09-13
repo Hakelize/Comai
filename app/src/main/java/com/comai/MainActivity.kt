@@ -23,6 +23,8 @@ import com.comai.ui.theme.ComaiTheme
 import com.comai.voice.LanguagePreferences
 import com.comai.voice.TextNormalizer
 import com.comai.voice.VoiceInteractionManager
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -60,12 +62,13 @@ class MainActivity : ComponentActivity() {
         val textNormalizer = TextNormalizer()
         val languagePrefs = LanguagePreferences(this)
         val savedLanguage = languagePrefs.getLanguage()
+        com.comai.voice.AppLocaleManager.applyLocale(this, savedLanguage)
 
         // Factory to supply custom dependencies to ViewModels
         val chatViewModel = ViewModelProvider(this, object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return ChatViewModel(aiEngine, ttsManager, contextBridge, memoryRepository, textNormalizer) as T
+                return ChatViewModel(aiEngine, ttsManager, contextBridge, memoryRepository, textNormalizer, app.memoryContextProvider) as T
             }
         })[ChatViewModel::class.java]
 
@@ -86,10 +89,18 @@ class MainActivity : ComponentActivity() {
             }
         })[DashboardViewModel::class.java]
 
+        // Personal Schedule repository (single source of truth for Schedule & Calendar)
+        val personalPlanRepository = com.comai.data.repository.PersonalPlanRepository.getInstance(this)
+        val nearbyContextProvider = com.comai.nearby.NearbyContextProvider(this)
+
         val memoryViewModel = ViewModelProvider(this, object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return MemoryViewModel(memoryRepository) as T
+                return MemoryViewModel(
+                    memoryRepository = memoryRepository,
+                    personalPlanRepository = personalPlanRepository,
+                    nearbyContextProvider = nearbyContextProvider
+                ) as T
             }
         })[MemoryViewModel::class.java]
 
@@ -100,29 +111,6 @@ class MainActivity : ComponentActivity() {
                 return CapabilityViewModel(capabilityAuditor) as T
             }
         })[CapabilityViewModel::class.java]
-
-        // Native push-to-talk voice manager
-        val voiceManager = VoiceInteractionManager(
-            context = this,
-            ttsManager = ttsManager,
-            scope = lifecycleScope,
-            onSpeechRecognized = { recognizedText ->
-                chatViewModel.sendMessage(recognizedText)
-            }
-        ).apply {
-            onPermissionRequired = {
-                requestAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-            }
-        }
-
-        // Restore saved language into voiceManager and ttsManager
-        voiceManager.setLanguage(savedLanguage)
-        ttsManager.setLanguage(savedLanguage.ttsLocale)
-
-        this.chatViewModel = chatViewModel
-        this.voiceInteractionManager = voiceManager
-
-        handleEvaluationIntent(intent)
 
         // Onboarding and User Profile preferences
         val onboardingPreferences = com.comai.ui.screens.onboarding.OnboardingPreferences(this)
@@ -141,8 +129,31 @@ class MainActivity : ComponentActivity() {
             }
         })[HomeViewModel::class.java]
 
-        // Personal Schedule (from main)
-        val personalPlanRepository = com.comai.data.repository.PersonalPlanRepository(this)
+        // Native push-to-talk voice manager (retained across configuration changes / rotations in HomeViewModel)
+        val voiceManager = homeViewModel.voiceManager ?: VoiceInteractionManager(
+            context = applicationContext,
+            ttsManager = ttsManager
+        ).also {
+            homeViewModel.voiceManager = it
+        }
+
+        voiceManager.setOnSpeechRecognizedListener { recognizedText ->
+            chatViewModel.sendMessage(recognizedText)
+        }
+        voiceManager.onPermissionRequired = {
+            requestAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+
+        // Restore saved language into voiceManager and ttsManager
+        voiceManager.setLanguage(savedLanguage)
+        ttsManager.setLanguage(savedLanguage.ttsLocale)
+
+        this.chatViewModel = chatViewModel
+        this.voiceInteractionManager = voiceManager
+
+        handleEvaluationIntent(intent)
+
+        // Personal Schedule (single source of truth)
         val personalScheduleViewModel = ViewModelProvider(this, object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
@@ -150,46 +161,87 @@ class MainActivity : ComponentActivity() {
             }
         })[com.comai.ui.screens.schedule.PersonalScheduleViewModel::class.java]
 
+        val isFromReminder = intent.getBooleanExtra("extra_opened_from_reminder", false)
+        if (isFromReminder) {
+            com.comai.scheduling.AlarmAudioPlayer.stop()
+        }
+
         val startDestination = if (onboardingPreferences.isOnboardingCompleted()) {
-            com.comai.ui.navigation.Routes.HOME
+            if (isFromReminder) com.comai.ui.navigation.Routes.CALENDAR else com.comai.ui.navigation.Routes.HOME
         } else {
             com.comai.ui.navigation.Routes.ONBOARDING
         }
 
         setContent {
             ComaiTheme {
-                ComaiNavGraph(
-                    startDestination = startDestination,
-                    homeViewModel = homeViewModel,
-                    chatViewModel = chatViewModel,
-                    audioViewModel = audioViewModel,
-                    dashboardViewModel = dashboardViewModel,
-                    memoryViewModel = memoryViewModel,
-                    capabilityViewModel = capabilityViewModel,
-                    personalScheduleViewModel = personalScheduleViewModel,
-                    onboardingViewModel = onboardingViewModel,
-                    voiceManager = voiceManager,
-                    onLanguageChanged = { lang ->
-                        voiceManager.setLanguage(lang)
-                        ttsManager.setLanguage(lang.ttsLocale)
-                        chatViewModel.setLanguage(lang)
-                        languagePrefs.setLanguage(lang)
-                        val currentProf = onboardingPreferences.getProfile()
-                        onboardingPreferences.saveProfile(currentProf.copy(preferredLanguage = lang))
-                        homeViewModel.refreshState()
+                var currentAppLanguage by androidx.compose.runtime.remember {
+                    androidx.compose.runtime.mutableStateOf(savedLanguage)
+                }
+
+                val locale = androidx.compose.runtime.remember(currentAppLanguage) {
+                    java.util.Locale(currentAppLanguage.uiLocaleTag)
+                }
+                val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+                val localizedConfiguration = androidx.compose.runtime.remember(currentAppLanguage, configuration) {
+                    android.content.res.Configuration(configuration).apply {
+                        setLocale(locale)
                     }
-                )
+                }
+                val baseActivity = this@MainActivity
+                val localizedContext = androidx.compose.runtime.remember(currentAppLanguage, baseActivity) {
+                    object : android.content.ContextWrapper(baseActivity.createConfigurationContext(localizedConfiguration)),
+                        androidx.activity.result.ActivityResultRegistryOwner {
+                        override val activityResultRegistry: androidx.activity.result.ActivityResultRegistry
+                            get() = baseActivity.activityResultRegistry
+                    }
+                }
+
+                androidx.compose.runtime.CompositionLocalProvider(
+                    androidx.compose.ui.platform.LocalConfiguration provides localizedConfiguration,
+                    androidx.compose.ui.platform.LocalContext provides localizedContext,
+                    androidx.activity.compose.LocalActivityResultRegistryOwner provides baseActivity
+                ) {
+                    ComaiNavGraph(
+                        startDestination = startDestination,
+                        homeViewModel = homeViewModel,
+                        chatViewModel = chatViewModel,
+                        audioViewModel = audioViewModel,
+                        dashboardViewModel = dashboardViewModel,
+                        memoryViewModel = memoryViewModel,
+                        capabilityViewModel = capabilityViewModel,
+                        personalScheduleViewModel = personalScheduleViewModel,
+                        onboardingViewModel = onboardingViewModel,
+                        voiceManager = voiceManager,
+                        onLanguageChanged = { lang ->
+                            currentAppLanguage = lang
+                            com.comai.voice.AppLocaleManager.applyLocale(this@MainActivity, lang)
+                            voiceManager.setLanguage(lang)
+                            ttsManager.setLanguage(lang.ttsLocale)
+                            chatViewModel.setLanguage(lang)
+                            languagePrefs.setLanguage(lang)
+                            val currentProf = onboardingPreferences.getProfile()
+                            onboardingPreferences.saveProfile(currentProf.copy(preferredLanguage = lang))
+                            homeViewModel.refreshState()
+                        }
+                    )
+                }
             }
         }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra("extra_opened_from_reminder", false)) {
+            com.comai.scheduling.AlarmAudioPlayer.stop()
+        }
         handleEvaluationIntent(intent)
     }
 
     override fun onDestroy() {
-        voiceInteractionManager?.cancel()
+        if (!isChangingConfigurations) {
+            voiceInteractionManager?.cancel()
+        }
         super.onDestroy()
     }
 

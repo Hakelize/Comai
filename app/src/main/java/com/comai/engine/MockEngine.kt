@@ -34,6 +34,7 @@ class MockEngine : AIEngine {
             task.contains("what time do i") || task.contains("where do i") ||
             task.contains("recall") || task.contains("my work") || task.contains("my office") -> {
                 val retrieved = context.retrievedData?.trim()
+                    ?: context.memoryContext?.takeIf { it.isNotEmpty() }?.joinToString("\n") { "- $it" }
                 if (!retrieved.isNullOrBlank()) {
                     AIResponse(
                         action = "memory_recall",

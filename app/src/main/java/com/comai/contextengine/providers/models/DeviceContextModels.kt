@@ -175,5 +175,6 @@ data class DeviceContext(
     val screen: ScreenContextData? = null,
     val notification: NotificationContextData? = null,
     val app: AppContextData? = null,
+    val digitalActivity: com.comai.digitalactivity.model.DigitalActivityContextData? = null,
     val timestampMs: Long = System.currentTimeMillis()
 )

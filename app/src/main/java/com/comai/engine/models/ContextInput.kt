@@ -19,6 +19,9 @@ data class ContextInput(
     @SerializedName("retrieved_data")
     val retrievedData: String? = null,
 
+    @SerializedName("memory_context")
+    val memoryContext: List<String>? = null,
+
     val task: String = "",
 
     val constraints: String = "under 30 words, warm tone"

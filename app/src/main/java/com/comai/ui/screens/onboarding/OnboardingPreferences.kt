@@ -10,6 +10,7 @@ import com.comai.voice.ComaiLanguage
 data class UserOnboardingProfile(
     val name: String = "",
     val preferredLanguage: ComaiLanguage = ComaiLanguage.ENGLISH,
+    val gender: String = "Prefer not to say",
     val weekdayType: String = "Work",
     val placeName: String = "",
     val workplace: String = "",
@@ -46,6 +47,7 @@ open class OnboardingPreferences(context: Context? = null) {
         } catch (_: Exception) {
             ComaiLanguage.ENGLISH
         }
+        val gender = prefs?.getString(KEY_GENDER, "Prefer not to say") ?: "Prefer not to say"
         val weekdayType = prefs?.getString(KEY_WEEKDAY_TYPE, "Work") ?: "Work"
         val placeName = prefs?.getString(KEY_PLACE_NAME, "") ?: ""
         val workplace = prefs?.getString(KEY_WORKPLACE, placeName) ?: placeName
@@ -59,6 +61,7 @@ open class OnboardingPreferences(context: Context? = null) {
         return UserOnboardingProfile(
             name = name,
             preferredLanguage = language,
+            gender = gender,
             weekdayType = weekdayType,
             placeName = placeName.ifBlank { workplace.ifBlank { college } },
             workplace = workplace,
@@ -75,6 +78,7 @@ open class OnboardingPreferences(context: Context? = null) {
         prefs?.edit()
             ?.putString(KEY_USER_NAME, profile.name)
             ?.putString(KEY_PREFERRED_LANGUAGE, profile.preferredLanguage.name)
+            ?.putString(KEY_GENDER, profile.gender)
             ?.putString(KEY_WEEKDAY_TYPE, profile.weekdayType)
             ?.putString(KEY_PLACE_NAME, profile.placeName)
             ?.putString(KEY_WORKPLACE, profile.workplace)
@@ -97,6 +101,7 @@ open class OnboardingPreferences(context: Context? = null) {
         private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
         private const val KEY_USER_NAME = "user_name"
         private const val KEY_PREFERRED_LANGUAGE = "preferred_language"
+        private const val KEY_GENDER = "gender"
         private const val KEY_WEEKDAY_TYPE = "weekday_type"
         private const val KEY_PLACE_NAME = "place_name"
         private const val KEY_WORKPLACE = "workplace"

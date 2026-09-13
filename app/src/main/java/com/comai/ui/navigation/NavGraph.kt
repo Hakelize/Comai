@@ -26,6 +26,7 @@ import com.comai.ui.screens.schedule.PersonalScheduleViewModel
 import com.comai.voice.ComaiLanguage
 import com.comai.voice.VoiceInteractionManager
 
+import com.comai.ui.screens.schedule.CalendarScreen
 import com.comai.ui.screens.ramdashboard.RamContextDashboardScreen
 import com.comai.ui.screens.ramdashboard.RamContextDashboardViewModel
 
@@ -40,7 +41,9 @@ object Routes {
     const val MEMORY = "memory"
     const val CAPABILITY = "capability"
     const val PERSONAL_SCHEDULE = "personal_schedule"
+    const val CALENDAR = "calendar"
     const val RAM_DASHBOARD = "ram_dashboard"
+    const val DIGITAL_ACTIVITY = "digital_activity"
 }
 
 @Composable
@@ -72,7 +75,8 @@ fun ComaiNavGraph(
                         navController.navigate(Routes.HOME) {
                             popUpTo(Routes.ONBOARDING) { inclusive = true }
                         }
-                    }
+                    },
+                    onLanguageChanged = onLanguageChanged
                 )
             }
         }
@@ -86,8 +90,7 @@ fun ComaiNavGraph(
                 onNavigateToRoutine = { navController.navigate(Routes.ROUTINE) },
                 onNavigateToProfile = { navController.navigate(Routes.PROFILE) },
                 onNavigateToMemory = { navController.navigate(Routes.MEMORY) },
-                onNavigateToDashboard = { navController.navigate(Routes.DASHBOARD) },
-                onLanguageChanged = onLanguageChanged
+                onNavigateToDashboard = { navController.navigate(Routes.DASHBOARD) }
             )
         }
 
@@ -96,9 +99,32 @@ fun ComaiNavGraph(
                 viewModel = chatViewModel,
                 voiceManager = voiceManager,
                 onBack = { navController.popBackStack() },
+                onNavigateToHome = {
+                    navController.navigate(Routes.HOME) {
+                        popUpTo(Routes.HOME) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToRoutine = {
+                    navController.navigate(Routes.ROUTINE) {
+                        popUpTo(Routes.HOME) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToProfile = {
+                    navController.navigate(Routes.PROFILE) {
+                        popUpTo(Routes.HOME) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToMemory = {
+                    navController.navigate(Routes.MEMORY) {
+                        popUpTo(Routes.HOME) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                },
                 onNavigateToAudio = { navController.navigate(Routes.AUDIO) },
-                onNavigateToDashboard = { navController.navigate(Routes.DASHBOARD) },
-                onNavigateToMemory = { navController.navigate(Routes.MEMORY) }
+                onNavigateToDashboard = { navController.navigate(Routes.DASHBOARD) }
             )
         }
 
@@ -120,6 +146,8 @@ fun ComaiNavGraph(
                 onNavigateToRoutine = { navController.navigate(Routes.ROUTINE) },
                 onNavigateToMemory = { navController.navigate(Routes.MEMORY) },
                 onNavigateToPersonalSchedule = { navController.navigate(Routes.PERSONAL_SCHEDULE) },
+                onNavigateToCalendar = { navController.navigate(Routes.CALENDAR) },
+                onNavigateToDigitalActivity = { navController.navigate(Routes.DIGITAL_ACTIVITY) },
                 onLanguageChanged = onLanguageChanged
             )
         }
@@ -129,6 +157,26 @@ fun ComaiNavGraph(
                 PersonalScheduleScreen(
                     viewModel = personalScheduleViewModel,
                     onBack = { navController.popBackStack() },
+                    onNavigateToCalendar = { navController.navigate(Routes.CALENDAR) },
+                    onNavigateToHome = { navController.navigate(Routes.HOME) },
+                    onNavigateToChat = { navController.navigate(Routes.CHAT) },
+                    onNavigateToRoutine = { navController.navigate(Routes.ROUTINE) },
+                    onNavigateToMemory = { navController.navigate(Routes.MEMORY) },
+                    onNavigateToProfile = { navController.navigate(Routes.PROFILE) }
+                )
+            }
+        }
+
+        composable(Routes.CALENDAR) {
+            if (personalScheduleViewModel != null) {
+                CalendarScreen(
+                    viewModel = personalScheduleViewModel,
+                    onBack = { navController.popBackStack() },
+                    onNavigateToPersonalSchedule = {
+                        navController.navigate(Routes.PERSONAL_SCHEDULE) {
+                            popUpTo(Routes.CALENDAR) { inclusive = true }
+                        }
+                    },
                     onNavigateToHome = { navController.navigate(Routes.HOME) },
                     onNavigateToChat = { navController.navigate(Routes.CHAT) },
                     onNavigateToRoutine = { navController.navigate(Routes.ROUTINE) },
@@ -178,6 +226,15 @@ fun ComaiNavGraph(
             val ramViewModel: RamContextDashboardViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
             RamContextDashboardScreen(
                 viewModel = ramViewModel,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.DIGITAL_ACTIVITY) {
+            val digitalActivityViewModel: com.comai.ui.screens.digitalactivity.DigitalActivityViewModel =
+                androidx.lifecycle.viewmodel.compose.viewModel()
+            com.comai.ui.screens.digitalactivity.DigitalActivityScreen(
+                viewModel = digitalActivityViewModel,
                 onBack = { navController.popBackStack() }
             )
         }

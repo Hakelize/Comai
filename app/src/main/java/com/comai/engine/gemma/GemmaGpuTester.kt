@@ -202,12 +202,15 @@ object GemmaGpuTester {
     }
 
     private fun resolveModelPath(context: Context): String {
-        val directFile = File(DEFAULT_MODEL_PATH)
-        if (directFile.exists()) return directFile.absolutePath
-
         val appSpecificDir = context.getExternalFilesDir("models")
         val appSpecificFile = File(appSpecificDir, "gemma-4-E4B-it.litertlm")
         if (appSpecificFile.exists()) return appSpecificFile.absolutePath
+
+        val emulatedStorage = File("/storage/emulated/0/Android/data/com.comai/files/models/gemma-4-E4B-it.litertlm")
+        if (emulatedStorage.exists()) return emulatedStorage.absolutePath
+
+        val directFile = File(DEFAULT_MODEL_PATH)
+        if (directFile.exists()) return directFile.absolutePath
 
         return DEFAULT_MODEL_PATH
     }

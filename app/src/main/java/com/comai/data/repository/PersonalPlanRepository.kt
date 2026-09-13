@@ -3,6 +3,7 @@ package com.comai.data.repository
 import android.content.Context
 import android.content.SharedPreferences
 import com.comai.data.models.PersonalPlan
+import com.comai.data.models.ReminderType
 import com.comai.scheduling.ScheduleAlarmManager
 import com.comai.util.TimeUtils
 import com.google.gson.Gson
@@ -15,6 +16,7 @@ import java.util.UUID
 /**
  * Local repository for persisting and managing user's Personal Plans,
  * integrated with real-time Android AlarmManager scheduling.
+ * Acts as the SINGLE SOURCE OF TRUTH for both Personal Schedule and Calendar.
  */
 class PersonalPlanRepository(context: Context) {
 
@@ -39,43 +41,55 @@ class PersonalPlanRepository(context: Context) {
                 PersonalPlan(
                     title = "Drink water",
                     time = "10:00 AM",
-                    repeatFrequency = "Daily"
+                    repeatFrequency = "Daily",
+                    reminderType = ReminderType.NOTIFICATION
                 ),
                 PersonalPlan(
                     title = "Take a break",
                     time = "3:30 PM",
-                    repeatFrequency = "Daily"
+                    repeatFrequency = "Daily",
+                    reminderType = ReminderType.NOTIFICATION
                 ),
                 PersonalPlan(
                     title = "Call Mom",
                     time = "6:00 PM",
-                    repeatFrequency = "Daily"
+                    repeatFrequency = "Daily",
+                    reminderType = ReminderType.NOTIFICATION
                 ),
                 PersonalPlan(
                     title = "Go to gym",
                     time = "7:00 PM",
-                    repeatFrequency = "Daily"
+                    repeatFrequency = "Daily",
+                    reminderType = ReminderType.NOTIFICATION
                 )
             )
             saveInternal(defaultPlans)
-            // Schedule default enabled plans
             alarmManager.rescheduleAll(defaultPlans)
         } else {
             try {
                 val type = object : TypeToken<List<PersonalPlan>>() {}.type
                 val list: List<PersonalPlan> = gson.fromJson(json, type) ?: emptyList()
-                val sorted = sortPlans(list)
+                @Suppress("SENSELESS_COMPARISON")
+                val safeList = list.map { plan ->
+                    if (plan.reminderType == null) plan.copy(reminderType = ReminderType.NOTIFICATION) else plan
+                }
+                val sorted = sortPlans(safeList)
                 _plans.value = sorted
-                // Ensure all enabled plans are scheduled with AlarmManager
+                // Arm all active enabled plans (past ones will be cleanly skipped by ScheduleAlarmManager)
                 alarmManager.rescheduleAll(sorted.filter { it.isEnabled })
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _plans.value = emptyList()
             }
         }
     }
 
     private fun sortPlans(list: List<PersonalPlan>): List<PersonalPlan> {
-        return list.sortedBy { TimeUtils.parseTime(it.time).toMinutesOfDay() }
+        return list.sortedWith(
+            compareBy(
+                { it.date ?: "" },
+                { TimeUtils.parseTime(it.time).toMinutesOfDay() }
+            )
+        )
     }
 
     private fun saveInternal(list: List<PersonalPlan>) {
@@ -85,12 +99,20 @@ class PersonalPlanRepository(context: Context) {
         prefs.edit().putString(KEY_PLANS, json).apply()
     }
 
-    fun addPlan(title: String, time: String, repeatFrequency: String = "Daily"): PersonalPlan {
+    fun addPlan(
+        title: String,
+        time: String,
+        repeatFrequency: String = "Daily",
+        reminderType: ReminderType = ReminderType.NOTIFICATION,
+        date: String? = null
+    ): PersonalPlan {
         val newPlan = PersonalPlan(
             id = UUID.randomUUID().toString(),
             title = title.trim(),
             time = TimeUtils.normalizeTo12Hour(time),
+            date = date?.trim()?.ifBlank { null },
             repeatFrequency = repeatFrequency,
+            reminderType = reminderType,
             isEnabled = true
         )
         val current = _plans.value.toMutableList()
@@ -102,7 +124,15 @@ class PersonalPlanRepository(context: Context) {
         return newPlan
     }
 
-    fun updatePlan(id: String, title: String, time: String, repeatFrequency: String, isEnabled: Boolean): PersonalPlan? {
+    fun updatePlan(
+        id: String,
+        title: String,
+        time: String,
+        repeatFrequency: String,
+        reminderType: ReminderType = ReminderType.NOTIFICATION,
+        isEnabled: Boolean,
+        date: String? = null
+    ): PersonalPlan? {
         val current = _plans.value.toMutableList()
         val index = current.indexOfFirst { it.id == id }
         if (index == -1) return null
@@ -113,7 +143,9 @@ class PersonalPlanRepository(context: Context) {
         val updated = current[index].copy(
             title = title.trim(),
             time = TimeUtils.normalizeTo12Hour(time),
+            date = date?.trim()?.ifBlank { null } ?: current[index].date,
             repeatFrequency = repeatFrequency,
+            reminderType = reminderType,
             isEnabled = isEnabled
         )
         current[index] = updated
@@ -158,5 +190,14 @@ class PersonalPlanRepository(context: Context) {
     companion object {
         private const val PREFS_NAME = "comai_personal_plans_prefs"
         private const val KEY_PLANS = "key_personal_plans_json"
+
+        @Volatile
+        private var INSTANCE: PersonalPlanRepository? = null
+
+        fun getInstance(context: Context): PersonalPlanRepository {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: PersonalPlanRepository(context.applicationContext).also { INSTANCE = it }
+            }
+        }
     }
 }

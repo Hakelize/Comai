@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">COMAI</string>
+
+    <!-- General Actions & States -->
+    <string name="ready">தயாராக உள்ளது</string>
+    <string name="tap_to_talk">பேச தட்டவும்</string>
+    <string name="listening">கேட்கிறது…</string>
+    <string name="thinking">யோசிக்கிறது…</string>
+    <string name="speaking">பேசுகிறது…</string>
+    <string name="tap_to_retry">மீண்டும் முயற்சிக்க தட்டவும்</string>
+    <string name="speak_now">இப்போது பேசுங்கள்…</string>
+    <string name="message_hint">செய்தி</string>
+    <string name="cancel">ரத்து</string>
+    <string name="save">சேமி</string>
+    <string name="edit">திருத்து</string>
+    <string name="delete">நீக்கு</string>
+    <string name="enable">இயக்கு</string>
+    <string name="back">பின்செல்</string>
+    <string name="close">மூடு</string>
+    <string name="btn_continue">தொடரவும்</string>
+    <string name="btn_get_started">தொடங்கலாம்</string>
+    <string name="btn_skip">தவிர்க்க</string>
+    <string name="btn_grant">அனுமதி வழங்குக</string>
+    <string name="btn_done">முடிந்தது</string>
+    <string name="how_can_i_help">நான் உங்களுக்கு எப்படி உதவலாம்?</string>
+
+    <!-- Navigation Labels -->
+    <string name="nav_home">முகப்பு</string>
+    <string name="nav_chat">அரட்டை</string>
+    <string name="nav_routine">வழக்கம்</string>
+    <string name="nav_memory">நினைவகம்</string>
+    <string name="nav_profile">சுயவிவரம்</string>
+    <string name="nav_schedule">அட்டவணை</string>
+    <string name="nav_digital_activity">செயல்பாடு</string>
+
+    <!-- Home Screen Greetings & Status -->
+    <string name="greeting_morning">காலை வணக்கம்</string>
+    <string name="greeting_afternoon">மதிய வணக்கம்</string>
+    <string name="greeting_evening">மாலை வணக்கம்</string>
+    <string name="greeting_night">இரவு வணக்கம்</string>
+    <string name="greeting_fallback">வணக்கம்</string>
+
+    <!-- Profile Screen -->
+    <string name="profile_title">பயனர் சுயவிவரம்</string>
+    <string name="profile_subtitle">COMAI உதவியாளருக்கான விருப்பங்கள் மற்றும் அட்டவணை.</string>
+    <string name="profile_general_settings">பொதுவான அமைப்புகள்</string>
+    <string name="profile_language">விருப்பமான மொழி</string>
+    <string name="profile_gender">பாலினம்</string>
+    <string name="profile_weekday_type">வார நாள் வழக்கம்</string>
+    <string name="profile_location">பணியிடம் / கல்லூரி</string>
+    <string name="profile_travel_mode">பயண முறை</string>
+    <string name="profile_personal_schedule">தனிப்பட்ட அட்டவணை</string>
+    <string name="profile_personal_schedule_sub">நினைவூட்டல்கள் மற்றும் நேர திட்டங்கள் (எ.கா. தண்ணீர் குடிக்க, அம்மாவை அழைக்க)</string>
+    <string name="profile_digital_activity">டிஜிட்டல் செயல்பாடு &amp; உற்பத்தித்திறன்</string>
+    <string name="profile_digital_activity_sub">திரை நேரம், செயலி பயன்பாடு மற்றும் சாதன செயல்பாடு</string>
+    <string name="profile_routine_section">தினசரி வழக்க நேரங்கள்</string>
+    <string name="profile_wake_time">விழிக்கும் நேரம்</string>
+    <string name="profile_leave_home">கிளம்பும் நேரம்</string>
+    <string name="profile_return_home">வீடு திரும்பும் நேரம்</string>
+    <string name="profile_sleep_time">உறங்கும் நேரம்</string>
+    <string name="profile_daily_routine_section">தினசரி வழக்கம்</string>
+    <string name="profile_daily_routine_desc">COMAI உதவியை தனிப்பயனாக்க உதவும் தினசரி நேர அட்டவணை.</string>
+    <string name="profile_edit_daily_routine">தினசரி வழக்கத்தை திருத்து</string>
+    <string name="profile_edit_routine_desc">உங்கள் வழக்கமான தினசரி நேரங்களை மாற்ற தட்டவும்.</string>
+    <string name="profile_permissions_section">கணினி அனுமதிகள்</string>
+    <string name="profile_perm_mic">மைக்ரோஃபோன்</string>
+    <string name="profile_perm_location">இருப்பிடம்</string>
+    <string name="profile_perm_activity">உடலியக்கம்</string>
+    <string name="profile_perm_notifications">அறிவிப்புகள்</string>
+    <string name="profile_perm_granted">செயலில் உள்ளது</string>
+    <string name="profile_perm_missing">அனுமதிக்கப்படவில்லை</string>
+    <string name="profile_edit_name">பெயரைத் திருத்து</string>
+    <string name="profile_edit_gender">பாலினத்தைத் திருத்து</string>
+    <string name="profile_enter_name">உங்கள் பெயரை உள்ளிடவும்</string>
+
+    <!-- Gender Options -->
+    <string name="gender_male">ஆண்</string>
+    <string name="gender_female">பெண்</string>
+    <string name="gender_prefer_not">கூற விரும்பவில்லை</string>
+
+    <!-- Weekday & Travel Options -->
+    <string name="weekday_work">வேலை</string>
+    <string name="weekday_college">கல்லூரி</string>
+    <string name="weekday_both">இரண்டும்</string>
+    <string name="weekday_other">மற்றவை</string>
+    <string name="travel_walk">நடை</string>
+    <string name="travel_bike">பைக் / இருசக்கர வாகனம்</string>
+    <string name="travel_car">கார்</string>
+    <string name="travel_transit">பொதுப்போக்குவரத்து</string>
+    <string name="travel_other">மற்றவை</string>
+
+    <!-- Personal Schedule -->
+    <string name="schedule_title">தனிப்பட்ட அட்டவணை</string>
+    <string name="schedule_subtitle">தினசரி வழக்க காலவரிசை மற்றும் தனிப்பயன் நேர நினைவூட்டல்கள்</string>
+    <string name="schedule_time_based_routines">நேர அடிப்படையிலான வழக்கங்கள்</string>
+    <string name="schedule_add_plan">நினைவூட்டல் சேர்</string>
+    <string name="schedule_empty_title">நினைவூட்டல்கள் இல்லை</string>
+    <string name="schedule_empty_sub">தண்ணீர் குடிப்பது அல்லது இடைவேளை எடுப்பது போன்ற முதல் நினைவூட்டலைச் சேர்க்கவும்</string>
+    <string name="schedule_notification">அறிவிப்பு</string>
+    <string name="schedule_alarm">அலாரம்</string>
+    <string name="schedule_reminder_type">நினைவூட்டல் வகை</string>
+    <string name="schedule_repeat">மீண்டும் செய்</string>
+    <string name="schedule_time">நேரம்</string>
+    <string name="schedule_task_name">செயல் பெயர்</string>
+    <string name="schedule_menstrual_cycle">மாதவிடாய் சுழற்சி கண்காணிப்பு</string>
+    <string name="schedule_on_device">சாதனத்தில் மட்டும்</string>
+    <string name="schedule_cycle_disclaimer">உங்கள் சேமிக்கப்பட்ட சுழற்சி தகவலின் அடிப்படையில் தோராயமாக கணக்கிடப்படுகிறது. மருத்துவ ஆலோசனையல்ல.</string>
+    <string name="schedule_cycle_configure">சுழற்சி விவரங்களை மாற்று</string>
+    <string name="schedule_cycle_setup_title">மாதவிடாய் சுழற்சி அமைப்பு</string>
+    <string name="schedule_cycle_setup_desc">எதிர்வரும் சுழற்சிகளை கணிக்க விவரங்களை உள்ளமைக்கவும்.</string>
+    <string name="schedule_cycle_setup_btn">அமைக்க</string>
+    <string name="schedule_cycle_length">சுழற்சி நாட்கள்</string>
+    <string name="schedule_period_duration">கால அளவு (நாட்கள்)</string>
+    <string name="schedule_last_period_date">கடைசி மாதவிடாய் தொடக்க தேதி</string>
+    <string name="schedule_next_period">அடுத்த எதிர்பார்க்கப்படும் தேதி</string>
+    <string name="schedule_enable_notif_banner">திட்டமிடப்பட்ட நினைவூட்டல்களைப் பெற அறிவிப்புகளை இயக்கவும்.</string>
+    <string name="schedule_plan_title">திட்ட தலைப்பு *</string>
+    <string name="schedule_quick_suggestions">விரைவு பரிந்துரைகள்</string>
+    <string name="schedule_repeat_frequency">மீண்டும் நிகழும் இடைவெளி</string>
+    <string name="schedule_add_plan_title">தனிப்பட்ட திட்டம் சேர்</string>
+    <string name="schedule_edit_plan_title">திட்டத்தைத் திருத்து</string>
+    <string name="schedule_save_reminder">நினைவூட்டலைச் சேமி</string>
+    <string name="schedule_save_changes">மாற்றங்களைச் சேமி</string>
+
+    <!-- Digital Activity & Productivity -->
+    <string name="activity_title">டிஜிட்டல் செயல்பாடு &amp; உற்பத்தித்திறன்</string>
+    <string name="activity_screen_time">மொத்த திரை நேரம்</string>
+    <string name="activity_today_screen_time">இன்றைய திரை நேரம்</string>
+    <string name="activity_top_apps">அதிகம் பயன்படுத்தப்பட்ட செயலிகள்</string>
+    <string name="activity_categories">பிரிவு வாரியான பயன்பாடு</string>
+    <string name="activity_device_state">சாதன நிலை</string>
+    <string name="activity_monitoring_title">செயல்பாட்டுக் கண்காணிப்பு</string>
+    <string name="activity_monitoring_desc">உள்ளூர் சாதன நுண்ணறிவு மற்றும் உற்பத்தித்திறன் கண்காணிப்பை இயக்குங்கள்</string>
+    <string name="activity_contextual_intelligence">சூழல் நுண்ணறிவு</string>
+    <string name="activity_permission_required">பயன்பாட்டு அணுகல் அனுமதி தேவை</string>
+    <string name="activity_permission_desc">திரை நேரத்தை உங்கள் சாதனத்தில் கண்காணிக்க COMAI-க்கு அனுமதி தேவை.</string>
+    <string name="activity_grant_permission">அனுமதி வழங்கவும்</string>
+    <string name="activity_app_usage">செயலி பயன்பாடு</string>
+    <string name="activity_productivity_limits">உற்பத்தித்திறன் வரம்புகள்</string>
+    <string name="activity_add_limit">செயலி வரம்பு சேர்</string>
+    <string name="activity_no_usage">இன்று குறிப்பிடத்தக்க செயலி பயன்பாடு இல்லை.</string>
+    <string name="activity_most_used">அதிகம் பயன்படுத்தியது: %1$s — %2$s</string>
+
+    <!-- Chat & Media -->
+    <string name="chat_attach_title">ஊடகத்தை இணைக்கவும்</string>
+    <string name="chat_take_photo">புகைப்படம் எடுக்க (கேமரா)</string>
+    <string name="chat_select_image">படம் தேர்ந்தெடுக்க</string>
+    <string name="chat_select_file">ஆவணம் / கோப்பு தேர்ந்தெடுக்க</string>
+    <string name="chat_photo_attached">இணைக்கப்பட்ட புகைப்படம்</string>
+    <string name="chat_doc_attached">இணைக்கப்பட்ட ஆவணம்</string>
+    <string name="chat_camera_perm_required">புகைப்படங்களை எடுக்க கேமரா அனுமதி தேவை</string>
+    <string name="chat_memory_tooltip">தனிப்பட்ட நினைவகம்</string>
+    <string name="chat_voice_listening">கேட்கிறது: %s</string>
+    <string name="chat_voice_processing">குரலை செயலாக்குகிறது…</string>
+    <string name="chat_voice_speaking">பேசுகிறது…</string>
+    <string name="chat_voice_error">குரல் அறிதல் பிழை</string>
+    <string name="chat_mic_stop">கேட்பதை நிறுத்து</string>
+    <string name="chat_mic_start">பேசத் தொடங்கு</string>
+
+    <!-- Onboarding Steps -->
+    <string name="ob_welcome_title">COMAI-ஐ சந்திக்கவும்</string>
+    <string name="ob_welcome_desc">உங்கள் வழக்கத்தை அறிந்து, உங்கள் நாளைப் புரிந்து, சரியான நேரத்தில் உதவும் உங்கள் தனிப்பட்ட AI தோழன்.</string>
+    <string name="ob_features_title">COMAI என்ன செய்ய முடியும்</string>
+    <string name="ob_features_sub">உங்கள் நாளைப் புரிந்து உங்கள் வாழ்க்கைக்குப் பொருந்தும் ஒரு தோழன்.</string>
+    <string name="ob_f1_title">COMAI உங்கள் வழக்கத்தை அறிந்துகொள்ளும்</string>
+    <string name="ob_f1_desc">காலப்போக்கில், உங்கள் வழக்கமான அட்டவணை, இடங்கள் மற்றும் பழக்கவழக்கங்களை COMAI புரிந்துகொள்கிறது.</string>
+    <string name="ob_f2_title">முக்கியமானவற்றை COMAI நினைவில் வைத்திருக்கும்</string>
+    <string name="ob_f2_desc">எதை நினைவில் வைத்திருக்க வேண்டும் என்பதை நீங்கள் கூறலாம்; உங்கள் நினைவுகளின் முழு கட்டுப்பாடு உங்களுக்கே.</string>
+    <string name="ob_f3_title">மாற்றங்கள் ஏற்படும்போது COMAI உதவும்</string>
+    <string name="ob_f3_desc">வழக்கத்திலிருந்து ஏதேனும் மாறினால், COMAI விசாரித்து உதவ முடியும்.</string>
+    <string name="ob_lang_title">COMAI-உடன் நீங்கள் எப்படி பேச விரும்புகிறீர்கள்?</string>
+    <string name="ob_lang_sub">COMAI குரல் மற்றும் இடைமுகத்திற்கான உங்கள் விருப்பமான மொழியைத் தேர்ந்தெடுக்கவும்.</string>
+    <string name="ob_voice_title">குரல் அமைப்பு</string>
+    <string name="ob_voice_sub">COMAI-உடன் இயல்பாகப் பேச மைக்ரோஃபோன் அனுமதியை அனுமதிக்கவும்.</string>
+    <string name="ob_voice_btn">மைக்ரோஃபோன் அணுகலை அனுமதிக்கவும்</string>
+    <string name="ob_voice_skip">குரல் இல்லாமல் தொடரவும்</string>
+    <string name="ob_profile_title">உங்களைப் பற்றி தெரிந்துகொள்ளலாம்</string>
+    <string name="ob_profile_sub">சரியான தருணங்களில் உதவ உங்கள் அட்டவணையை COMAI-க்கு தெரிவிக்கவும்.</string>
+    <string name="ob_field_name">உங்கள் பெயர் என்ன? *</string>
+    <string name="ob_field_gender">பாலினம்</string>
+    <string name="ob_field_weekday">உங்கள் வார நாளை எது சிறப்பாக விவரிக்கிறது? *</string>
+    <string name="ob_field_workplace">உங்கள் பணியிடத்தின் பெயர் என்ன? *</string>
+    <string name="ob_workplace_placeholder">எ.கா. அக்சென்ச்சர் / டெக் பார்க்</string>
+    <string name="ob_field_college">உங்கள் கல்லூரியின் பெயர் என்ன? *</string>
+    <string name="ob_college_placeholder">எ.கா. அரசு பொறியியல் கல்லூரி</string>
+    <string name="ob_field_wake">விழிக்கும் நேரம்</string>
+    <string name="ob_field_leave">கிளம்பும் நேரம்</string>
+    <string name="ob_field_return">வீடு திரும்பும் நேரம்</string>
+    <string name="ob_field_sleep">உறங்கும் நேரம்</string>
+    <string name="ob_field_travel">நீங்கள் வழக்கமாக எவ்வாறு பயணம் செய்கிறீர்கள்? *</string>
+    <string name="ob_loc_title">இருப்பிட விழிப்புணர்வு</string>
+    <string name="ob_loc_sub">பயண எச்சரிக்கைகள் மற்றும் வழக்க கண்காணிப்பை வழங்க COMAI உங்கள் பொதுவான இருப்பிடத்தைப் பயன்படுத்துகிறது.</string>
+    <string name="ob_loc_btn">இருப்பிட அணுகலை அனுமதிக்கவும்</string>
+    <string name="ob_privacy_title">தனியுரிமைக்கு முதலிடம்</string>
+    <string name="ob_privacy_desc">உங்கள் விவரங்கள், அட்டவணைகள் மற்றும் உரையாடல்கள் அனைத்தும் உங்கள் சாதனத்தில் மட்டுமே தனிப்பட்டதாக இருக்கும்.</string>
+    <string name="ob_finish_title">எல்லாம் தயார்!</string>
+    <string name="ob_finish_desc">உங்கள் நாளுக்கு உதவ COMAI தயாராக உள்ளது. தொடங்கலாம்!</string>
+    <string name="ob_finish_btn">COMAI-ஐப் பயன்படுத்தத் தொடங்குங்கள்</string>
+    <string name="lang_dialog_title">குரல் மற்றும் செயலி மொழி</string>
+    <string name="lang_dialog_sub">COMAI இடைமுகத்திற்கு நீங்கள் விரும்பும் மொழியைத் தேர்ந்தெடுக்கவும்.</string>
+
+    <!-- Calendar & Alarm Scheduling -->
+    <string name="calendar_title">கேலெண்டர்</string>
+    <string name="calendar_subtitle">நாட்கள் முழுவதும் உங்கள் அட்டவணை மற்றும் திட்டங்கள்</string>
+    <string name="calendar_today">இன்று</string>
+    <string name="calendar_no_schedules">இந்த தேதியில் திட்டங்கள் இல்லை</string>
+    <string name="calendar_add_schedule">திட்டத்தைச் சேர்க்கவும்</string>
+    <string name="calendar_schedule_details">திட்ட விவரங்கள்</string>
+    <string name="calendar_date">தேதி</string>
+    <string name="calendar_status">நிலை</string>
+    <string name="calendar_upcoming">வரவிருக்கும்</string>
+    <string name="calendar_completed">முடிந்தது</string>
+    <string name="calendar_past">முடிந்தது</string>
+    <string name="calendar_view_calendar">கேலெண்டரில் பார்க்கவும்</string>
+    <string name="calendar_view_schedule">பட்டியலைப் பார்க்கவும்</string>
+    <string name="calendar_schedules_count">%1$d திட்டங்கள்</string>
+    <string name="schedule_exact_alarm_required">சரியான அலாரம் அனுமதி தேவை</string>
+    <string name="schedule_exact_alarm_desc">குறிப்பிட்ட நேரத்தில் COMAI அலாரம் ஒலிக்க கணினி அமைப்புகளில் சரியான அலாரங்களை அனுமதிக்கவும்.</string>
+    <string name="schedule_exact_alarm_btn">அமைப்புகளைத் திறக்கவும்</string>
+    <string name="schedule_alarm_enabled">அலாரம் இயக்கப்பட்டது</string>
+    <string name="schedule_notification_enabled">அறிவிப்பு இயக்கப்பட்டது</string>
+    <string name="schedule_permission_required">அனுமதி தேவை</string>
+    <string name="alarm_dismiss">நிறுத்து</string>
+    <string name="alarm_snooze">மீண்டும் நினைவூட்டு (10 நிமி)</string>
+    <string name="alarm_ringing">அலாரம் ஒலிக்கிறது</string>
+
+    <!-- Memory Tab: Calendar & Location & Nearby Context -->
+    <string name="memory_tab_calendar">கேலெண்டர்</string>
+    <string name="memory_tab_location">இருப்பிடம் &amp; அருகில்</string>
+    <string name="memory_tab_memories">நினைவுகள்</string>
+    <string name="location_title">தற்போதைய இருப்பிடம்</string>
+    <string name="location_permission_title">இருப்பிட அணுகல்</string>
+    <string name="location_permission_desc">நீங்கள் எங்கிருக்கிறீர்கள் என்பதைப் புரிந்து கொண்டு அருகிலுள்ள பயனுள்ள தகவல்களை வழங்க COMAI-க்கு இருப்பிட அணுகலை அனுமதிக்கவும்.</string>
+    <string name="location_grant_permission">அனுமதிக்கவும்</string>
+    <string name="location_disabled_desc">உங்கள் சாதன அமைப்புகளில் இருப்பிடச் சேவைகள் அணைக்கப்பட்டுள்ளன.</string>
+    <string name="location_open_settings">அமைப்புகளைத் திறக்கவும்</string>
+    <string name="location_refresh">புதுப்பிக்கவும்</string>
+    <string name="location_open_maps">வரைபடத்தில் பார்க்கவும்</string>
+    <string name="location_accuracy">துல்லியம்: ±%1$d மீ</string>
+    <string name="location_status_live">நேரலை GPS இருப்பிடம்</string>
+    <string name="location_status_cached">சேமிக்கப்பட்ட இருப்பிடம்</string>
+    <string name="nearby_title">அருகிலுள்ள நிகழ்வுகள் மற்றும் சூழல்</string>
+    <string name="nearby_offline">நேரலை அருகிலுள்ள தகவல் ஆஃப்லைனில் கிடைக்காது.</string>
+    <string name="nearby_traffic">போக்குவரத்து &amp; பயணம்</string>
+    <string name="nearby_news">உள்ளூர் செய்திகள்</string>
+    <string name="nearby_events">அருகிலுள்ள நிகழ்வுகள்</string>
+    <string name="nearby_traffic_normal">உங்களைச் சுற்றியுள்ள போக்குவரத்து இயல்பாக உள்ளது.</string>
+    <string name="nearby_traffic_heavy">உங்கள் பாதையில் வழக்கத்தை விட அதிக போக்குவரத்து உள்ளது.</string>
+    <string name="nearby_no_events">இன்று அருகில் பெரிய பொது நிகழ்வுகள் எதுவும் இல்லை.</string>
+    <string name="nearby_no_news">இந்த பகுதியில் பயணத் தடங்கல்கள் எதுவும் இல்லை.</string>
+    <string name="nearby_schedule_alert">வழக்கத்தை விட அதிக போக்குவரத்து உள்ளது. %1$s-க்காக சிறிது முன்னதாகவே கிளம்பலாம்.</string>
+    <string name="calendar_no_schedules_day">இந்த நாளுக்கு திட்டங்கள் இல்லை</string>
+    <string name="location_perm_needed">உங்கள் தற்போதைய இருப்பிடத்தைக் காட்ட இருப்பிட அணுகல் தேவைப்படுகிறது.</string>
+    <string name="location_allow_btn">இருப்பிடத்தை அனுமதிக்கவும்</string>
+    <string name="location_you_marker">நீங்கள்</string>
+    <string name="section_calendar">கேலெண்டர்</string>
+    <string name="section_location">இருப்பிடம்</string>
+    <string name="section_nearby">அருகில்</string>
+    <string name="section_memories">தனிப்பட்ட நினைவுகள்</string>
+    <string name="todays_schedules">இன்றைய திட்டங்கள்</string>
+    <string name="selected_date_label">தேர்ந்தெடுக்கப்பட்ட தேதி</string>
+
+    <!-- Instagram-style Profile & 24-Hour Timeline -->
+    <string name="profile_edit_profile">சுயவிவரத்தைத் திருத்து</string>
+    <string name="profile_photo_options">சுயவிவரப் படம்</string>
+    <string name="profile_take_photo">புகைப்படம் எடுக்கவும்</string>
+    <string name="profile_choose_gallery">படத்தொகுப்பிலிருந்து தேர்ந்தெடுக்கவும்</string>
+    <string name="profile_remove_photo">புகைப்படத்தை நீக்கு</string>
+    <string name="profile_photo_removed">சுயவிவரப் படம் நீக்கப்பட்டது</string>
+    <string name="profile_photo_updated">சுயவிவரப் படம் புதுப்பிக்கப்பட்டது</string>
+    <string name="profile_cam_perm_needed">புகைப்படம் எடுக்க கேமரா அனுமதி தேவை.</string>
+    <string name="profile_saved_success">சுயவிவரம் சேமிக்கப்பட்டது</string>
+    <string name="profile_edit_profile_title">சுயவிவரத்தைத் திருத்து</string>
+    <string name="profile_field_name">முழுப் பெயர்</string>
+    <string name="profile_field_type">வாரநாள் வகை</string>
+    <string name="profile_field_place">பணியிடம் / கல்லூரி</string>
+    <string name="profile_field_travel">பயண முறை</string>
+    <string name="profile_save_changes">மாற்றங்களைச் சேமி</string>
+    <string name="profile_timeline_title">24-மணிநேர வழக்க காலவரிசை</string>
+    <string name="profile_timeline_wake">விழித்தெழல்</string>
+    <string name="profile_timeline_leave">வீட்டிலிருந்து கிளம்புதல்</string>
+    <string name="profile_timeline_work">பணி / கல்லூரி</string>
+    <string name="profile_timeline_return">வீடு திரும்புதல்</string>
+    <string name="profile_timeline_sleep">உறங்குதல்</string>
+    <string name="settings_title">அமைப்புகள்</string>
+    <string name="settings_voice_section">குரல் மற்றும் பேச்சு</string>
+    <string name="settings_privacy_badge">அனைத்து வழக்க சூழலும் நினைவுகளும் இந்த சாதனத்திலேயே செயல்படுத்தப்படுகின்றன. COMAI உங்கள் தனிப்பட்ட சுயவிவரத்தை மேகக்கணிக்கு பதிவேற்றாது.</string>
+</resources>

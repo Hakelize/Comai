@@ -39,6 +39,8 @@ class ContextRepositoryLoggingUnitTest {
             override fun proactiveEventDao() = throw UnsupportedOperationException()
             override fun memoryDao() = throw UnsupportedOperationException()
             override fun personalizationStateDao() = throw UnsupportedOperationException()
+            override fun appLimitDao() = throw UnsupportedOperationException()
+            override fun dailyActivityDao() = throw UnsupportedOperationException()
             override fun clearAllTables() {}
             override fun createInvalidationTracker(): InvalidationTracker = FakeInvalidationTracker(this)
             override fun createOpenHelper(config: androidx.room.DatabaseConfiguration) = throw UnsupportedOperationException()

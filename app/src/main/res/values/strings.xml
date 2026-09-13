@@ -1,3 +1,289 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Comai</string>
+    <string name="app_name">COMAI</string>
+
+    <!-- General Actions & States -->
+    <string name="ready">Ready</string>
+    <string name="tap_to_talk">Tap to talk</string>
+    <string name="listening">Listening…</string>
+    <string name="thinking">Thinking…</string>
+    <string name="speaking">Speaking…</string>
+    <string name="tap_to_retry">Tap to retry</string>
+    <string name="speak_now">Speak now…</string>
+    <string name="message_hint">Message</string>
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+    <string name="edit">Edit</string>
+    <string name="delete">Delete</string>
+    <string name="enable">Enable</string>
+    <string name="back">Back</string>
+    <string name="close">Close</string>
+    <string name="btn_continue">Continue</string>
+    <string name="btn_get_started">Get Started</string>
+    <string name="btn_skip">Skip</string>
+    <string name="btn_grant">Grant Permission</string>
+    <string name="btn_done">Done</string>
+    <string name="how_can_i_help">How can I help you today?</string>
+
+    <!-- Navigation Labels -->
+    <string name="nav_home">Home</string>
+    <string name="nav_chat">Chat</string>
+    <string name="nav_routine">Routine</string>
+    <string name="nav_memory">Memory</string>
+    <string name="nav_profile">Profile</string>
+    <string name="nav_schedule">Schedule</string>
+    <string name="nav_digital_activity">Activity</string>
+
+    <!-- Home Screen Greetings & Status -->
+    <string name="greeting_morning">Good morning</string>
+    <string name="greeting_afternoon">Good afternoon</string>
+    <string name="greeting_evening">Good evening</string>
+    <string name="greeting_night">Good night</string>
+    <string name="greeting_fallback">Good day</string>
+
+    <!-- Profile Screen -->
+    <string name="profile_title">USER PROFILE</string>
+    <string name="profile_subtitle">Personalized preferences and schedule for COMAI assistance.</string>
+    <string name="profile_general_settings">General Settings</string>
+    <string name="profile_language">Preferred Language</string>
+    <string name="profile_gender">Gender</string>
+    <string name="profile_weekday_type">Weekday Type</string>
+    <string name="profile_location">Workplace / Campus</string>
+    <string name="profile_travel_mode">Travel Mode</string>
+    <string name="profile_personal_schedule">Personal Schedule</string>
+    <string name="profile_personal_schedule_sub">Custom reminders &amp; timed plans (e.g. Drink water, Call Mom)</string>
+    <string name="profile_digital_activity">Digital Activity &amp; Productivity</string>
+    <string name="profile_digital_activity_sub">Screen time, app usage, productivity limits &amp; device activity</string>
+    <string name="profile_routine_section">Daily Routine Timings</string>
+    <string name="profile_wake_time">Wake-up Time</string>
+    <string name="profile_leave_home">Leave Home</string>
+    <string name="profile_return_home">Return Home</string>
+    <string name="profile_sleep_time">Sleep Time</string>
+    <string name="profile_daily_routine_section">DAILY ROUTINE</string>
+    <string name="profile_daily_routine_desc">General recurring schedule used to personalize COMAI assistance.</string>
+    <string name="profile_edit_daily_routine">Edit Daily Routine</string>
+    <string name="profile_edit_routine_desc">Tap each field to adjust your typical daily times.</string>
+    <string name="profile_permissions_section">System Permissions</string>
+    <string name="profile_perm_mic">Microphone</string>
+    <string name="profile_perm_location">Location</string>
+    <string name="profile_perm_activity">Physical Activity</string>
+    <string name="profile_perm_notifications">Notifications</string>
+    <string name="profile_perm_granted">Active</string>
+    <string name="profile_perm_missing">Not Granted</string>
+    <string name="profile_edit_name">Edit Name</string>
+    <string name="profile_edit_gender">Edit Gender</string>
+    <string name="profile_enter_name">Enter your name</string>
+
+    <!-- Gender Options -->
+    <string name="gender_male">Male</string>
+    <string name="gender_female">Female</string>
+    <string name="gender_prefer_not">Prefer not to say</string>
+
+    <!-- Weekday & Travel Options -->
+    <string name="weekday_work">Work</string>
+    <string name="weekday_college">College</string>
+    <string name="weekday_both">Both</string>
+    <string name="weekday_other">Other</string>
+    <string name="travel_walk">Walk</string>
+    <string name="travel_bike">Bike</string>
+    <string name="travel_car">Car</string>
+    <string name="travel_transit">Public transport</string>
+    <string name="travel_other">Other</string>
+
+    <!-- Personal Schedule -->
+    <string name="schedule_title">Personal Schedule</string>
+    <string name="schedule_subtitle">Daily routine timeline and custom timed reminders</string>
+    <string name="schedule_time_based_routines">Time-Based Routines</string>
+    <string name="schedule_add_plan">Add Reminder</string>
+    <string name="schedule_empty_title">No reminders yet</string>
+    <string name="schedule_empty_sub">Add your first reminder like drinking water or taking a break</string>
+    <string name="schedule_notification">Notification</string>
+    <string name="schedule_alarm">Alarm</string>
+    <string name="schedule_reminder_type">Reminder Type</string>
+    <string name="schedule_repeat">Repeat</string>
+    <string name="schedule_time">Time</string>
+    <string name="schedule_task_name">Task Name</string>
+    <string name="schedule_menstrual_cycle">Menstrual Cycle Tracking</string>
+    <string name="schedule_on_device">On-Device</string>
+    <string name="schedule_cycle_disclaimer">Estimated based on your saved cycle information. Non-medical guidance only.</string>
+    <string name="schedule_cycle_configure">Edit Cycle Info</string>
+    <string name="schedule_cycle_setup_title">Menstrual Cycle Setup</string>
+    <string name="schedule_cycle_setup_desc">Set up your cycle details for approximate upcoming estimates.</string>
+    <string name="schedule_cycle_setup_btn">Set Up</string>
+    <string name="schedule_cycle_length">Cycle Length (Days)</string>
+    <string name="schedule_period_duration">Period Duration (Days)</string>
+    <string name="schedule_last_period_date">Last Period Start Date</string>
+    <string name="schedule_next_period">Next Estimated Period</string>
+    <string name="schedule_enable_notif_banner">Enable notifications to receive your scheduled reminders on time.</string>
+    <string name="schedule_plan_title">Plan Title *</string>
+    <string name="schedule_quick_suggestions">Quick Suggestions</string>
+    <string name="schedule_repeat_frequency">Repeat Frequency</string>
+    <string name="schedule_add_plan_title">Add Personal Plan</string>
+    <string name="schedule_edit_plan_title">Edit Plan</string>
+    <string name="schedule_save_reminder">Save Reminder</string>
+    <string name="schedule_save_changes">Save Changes</string>
+
+    <!-- Digital Activity & Productivity -->
+    <string name="activity_title">Digital Activity &amp; Productivity</string>
+    <string name="activity_screen_time">Total Screen Time</string>
+    <string name="activity_today_screen_time">TODAY\'S SCREEN TIME</string>
+    <string name="activity_top_apps">Top Used Apps</string>
+    <string name="activity_categories">Category Breakdown</string>
+    <string name="activity_device_state">Device Activity State</string>
+    <string name="activity_monitoring_title">Activity Monitoring</string>
+    <string name="activity_monitoring_desc">Enable local device intelligence and productivity tracking</string>
+    <string name="activity_contextual_intelligence">CONTEXTUAL INTELLIGENCE</string>
+    <string name="activity_permission_required">Usage Access Permission Required</string>
+    <string name="activity_permission_desc">COMAI needs Usage Access permission to track screen time locally on this device.</string>
+    <string name="activity_grant_permission">Grant Permission</string>
+    <string name="activity_app_usage">APP USAGE</string>
+    <string name="activity_productivity_limits">PRODUCTIVITY LIMITS</string>
+    <string name="activity_add_limit">Add App Limit</string>
+    <string name="activity_no_usage">No significant app usage recorded today.</string>
+    <string name="activity_most_used">Most used: %1$s — %2$s</string>
+
+    <!-- Chat & Media -->
+    <string name="chat_attach_title">Attach Media</string>
+    <string name="chat_take_photo">Take Photo (Camera)</string>
+    <string name="chat_select_image">Select Image</string>
+    <string name="chat_select_file">Select Document / File</string>
+    <string name="chat_photo_attached">Photo Attachment</string>
+    <string name="chat_doc_attached">Attached Document</string>
+    <string name="chat_camera_perm_required">Camera permission required to capture photos</string>
+    <string name="chat_memory_tooltip">Personal Memory</string>
+    <string name="chat_voice_listening">Listening: %s</string>
+    <string name="chat_voice_processing">Processing speech…</string>
+    <string name="chat_voice_speaking">Speaking…</string>
+    <string name="chat_voice_error">Speech recognition error</string>
+    <string name="chat_mic_stop">Stop listening</string>
+    <string name="chat_mic_start">Start speaking</string>
+
+    <!-- Onboarding Steps -->
+    <string name="ob_welcome_title">Meet COMAI</string>
+    <string name="ob_welcome_desc">Your personal AI companion that learns your routine, understands your day, and helps you at the right time.</string>
+    <string name="ob_features_title">What COMAI Can Do</string>
+    <string name="ob_features_sub">A companion that understands your day and fits into your life.</string>
+    <string name="ob_f1_title">COMAI gets to know your routine</string>
+    <string name="ob_f1_desc">Over time, COMAI learns things like your usual schedule, places you visit, and everyday habits.</string>
+    <string name="ob_f2_title">COMAI remembers what matters</string>
+    <string name="ob_f2_desc">You can tell COMAI what you want it to remember, and you stay in control of your memories.</string>
+    <string name="ob_f3_title">COMAI helps when things change</string>
+    <string name="ob_f3_desc">If something is different from your usual routine, COMAI can check in and help.</string>
+    <string name="ob_lang_title">How would you like to talk to COMAI?</string>
+    <string name="ob_lang_sub">Choose your preferred language for COMAI voice and UI.</string>
+    <string name="ob_voice_title">Voice Setup</string>
+    <string name="ob_voice_sub">Allow microphone access so you can talk to COMAI naturally.</string>
+    <string name="ob_voice_btn">Allow Microphone Access</string>
+    <string name="ob_voice_skip">Continue without voice</string>
+    <string name="ob_profile_title">Let\'s Get to Know You</string>
+    <string name="ob_profile_sub">Tell COMAI your schedule so it can assist you at the right moments.</string>
+    <string name="ob_field_name">What\'s your name? *</string>
+    <string name="ob_field_gender">Gender</string>
+    <string name="ob_field_weekday">What best describes your weekday? *</string>
+    <string name="ob_field_workplace">What is your workplace name? *</string>
+    <string name="ob_workplace_placeholder">e.g. Acme Corp / Tech Park</string>
+    <string name="ob_field_college">What is your college name? *</string>
+    <string name="ob_college_placeholder">e.g. City Engineering College</string>
+    <string name="ob_field_wake">Wake-up Time</string>
+    <string name="ob_field_leave">Leave Home</string>
+    <string name="ob_field_return">Return Home</string>
+    <string name="ob_field_sleep">Sleep Time</string>
+    <string name="ob_field_travel">How do you usually travel? *</string>
+    <string name="ob_loc_title">Location Awareness</string>
+    <string name="ob_loc_sub">COMAI uses your general location to provide smart commute alerts and routine tracking.</string>
+    <string name="ob_loc_btn">Allow Location Access</string>
+    <string name="ob_privacy_title">Privacy First</string>
+    <string name="ob_privacy_desc">All your personal details, schedules, and conversations stay private and local on your device.</string>
+    <string name="ob_finish_title">You\'re All Set!</string>
+    <string name="ob_finish_desc">COMAI is ready to accompany you through your day. Let\'s begin!</string>
+    <string name="ob_finish_btn">Start Using COMAI</string>
+    <string name="lang_dialog_title">Voice &amp; App Language</string>
+    <string name="lang_dialog_sub">Select the language you want for the COMAI interface.</string>
+
+    <!-- Calendar & Alarm Scheduling -->
+    <string name="calendar_title">Calendar</string>
+    <string name="calendar_subtitle">Your schedule and plans across dates</string>
+    <string name="calendar_today">Today</string>
+    <string name="calendar_no_schedules">No schedules for this date</string>
+    <string name="calendar_add_schedule">Add Schedule</string>
+    <string name="calendar_schedule_details">Schedule Details</string>
+    <string name="calendar_date">Date</string>
+    <string name="calendar_status">Status</string>
+    <string name="calendar_upcoming">Upcoming</string>
+    <string name="calendar_completed">Completed</string>
+    <string name="calendar_past">Past</string>
+    <string name="calendar_view_calendar">View in Calendar</string>
+    <string name="calendar_view_schedule">View List</string>
+    <string name="calendar_schedules_count">%1$d schedule(s)</string>
+    <string name="schedule_exact_alarm_required">Exact Alarm Permission Required</string>
+    <string name="schedule_exact_alarm_desc">Allow exact alarms in system settings so COMAI can ring alarms at the scheduled time.</string>
+    <string name="schedule_exact_alarm_btn">Open Settings</string>
+    <string name="schedule_alarm_enabled">Alarm Enabled</string>
+    <string name="schedule_notification_enabled">Notification Enabled</string>
+    <string name="schedule_permission_required">Permission Required</string>
+    <string name="alarm_dismiss">Dismiss</string>
+    <string name="alarm_snooze">Snooze (10m)</string>
+    <string name="alarm_ringing">Alarm Ringing</string>
+
+    <!-- Memory Tab: Calendar & Location & Nearby Context -->
+    <string name="memory_tab_calendar">Calendar</string>
+    <string name="memory_tab_location">Location &amp; Nearby</string>
+    <string name="memory_tab_memories">Memories</string>
+    <string name="location_title">Current Location</string>
+    <string name="location_permission_title">Location Access</string>
+    <string name="location_permission_desc">Allow location access to help COMAI understand where you are and provide useful nearby information.</string>
+    <string name="location_grant_permission">Grant Permission</string>
+    <string name="location_disabled_desc">Location services are turned off in your device settings.</string>
+    <string name="location_open_settings">Open Settings</string>
+    <string name="location_refresh">Refresh</string>
+    <string name="location_open_maps">Open in Maps</string>
+    <string name="location_accuracy">Accuracy: ±%1$d m</string>
+    <string name="location_status_live">Live GPS Fix</string>
+    <string name="location_status_cached">Cached Fix</string>
+    <string name="nearby_title">Nearby Context &amp; Live Information</string>
+    <string name="nearby_offline">Live nearby information is unavailable offline.</string>
+    <string name="nearby_traffic">Traffic &amp; Commute</string>
+    <string name="nearby_news">Local Incidents &amp; News</string>
+    <string name="nearby_events">Nearby Events</string>
+    <string name="nearby_traffic_normal">Traffic looks normal around you.</string>
+    <string name="nearby_traffic_heavy">Traffic is heavier than usual on your route.</string>
+    <string name="nearby_no_events">No major public events reported nearby today.</string>
+    <string name="nearby_no_news">No active travel disruptions in this area.</string>
+    <string name="nearby_schedule_alert">Traffic is heavier than usual. You may want to leave a little earlier for %1$s.</string>
+    <string name="calendar_no_schedules_day">No schedules for this day</string>
+    <string name="location_perm_needed">Location access is needed to show your current location.</string>
+    <string name="location_allow_btn">Allow Location</string>
+    <string name="location_you_marker">You</string>
+    <string name="section_calendar">Calendar</string>
+    <string name="section_location">Location</string>
+    <string name="section_nearby">Nearby</string>
+    <string name="section_memories">Personal Memories</string>
+    <string name="todays_schedules">Today\'s schedules</string>
+    <string name="selected_date_label">Selected date</string>
+
+    <!-- Instagram-style Profile & 24-Hour Timeline -->
+    <string name="profile_edit_profile">Edit Profile</string>
+    <string name="profile_photo_options">Profile Photo</string>
+    <string name="profile_take_photo">Take Photo</string>
+    <string name="profile_choose_gallery">Choose from Gallery</string>
+    <string name="profile_remove_photo">Remove Photo</string>
+    <string name="profile_photo_removed">Profile photo removed</string>
+    <string name="profile_photo_updated">Profile photo updated</string>
+    <string name="profile_cam_perm_needed">Camera permission is required to capture a photo.</string>
+    <string name="profile_saved_success">Profile saved</string>
+    <string name="profile_edit_profile_title">Edit Profile</string>
+    <string name="profile_field_name">Full Name</string>
+    <string name="profile_field_type">Weekday Type</string>
+    <string name="profile_field_place">Workplace / College</string>
+    <string name="profile_field_travel">Commute Mode</string>
+    <string name="profile_save_changes">Save Changes</string>
+    <string name="profile_timeline_title">24-HOUR ROUTINE TIMELINE</string>
+    <string name="profile_timeline_wake">Wake Up</string>
+    <string name="profile_timeline_leave">Leave Home</string>
+    <string name="profile_timeline_work">Work / Campus</string>
+    <string name="profile_timeline_return">Return Home</string>
+    <string name="profile_timeline_sleep">Sleep</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_voice_section">Voice &amp; Speech</string>
+    <string name="settings_privacy_badge">All routine context and memories are processed on this device. COMAI does not upload your personal profile to external clouds.</string>
 </resources>

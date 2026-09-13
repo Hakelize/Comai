@@ -26,6 +26,7 @@ data class OnboardingUiState(
     val currentStep: OnboardingStep = OnboardingStep.WELCOME,
     val name: String = "",
     val preferredLanguage: ComaiLanguage = ComaiLanguage.ENGLISH,
+    val gender: String = "Prefer not to say",
     val weekdayType: String = "Work",
     val workplace: String = "",
     val college: String = "",
@@ -61,6 +62,7 @@ class OnboardingViewModel(
             OnboardingUiState(
                 name = saved.name,
                 preferredLanguage = saved.preferredLanguage,
+                gender = saved.gender,
                 weekdayType = saved.weekdayType,
                 workplace = saved.workplace,
                 college = saved.college,
@@ -97,6 +99,10 @@ class OnboardingViewModel(
             nameError = null,
             generalError = null
         )
+    }
+
+    fun updateGender(gender: String) {
+        _uiState.value = _uiState.value.copy(gender = gender)
     }
 
     fun updateLanguage(language: ComaiLanguage) {
@@ -332,6 +338,7 @@ class OnboardingViewModel(
         val profile = UserOnboardingProfile(
             name = state.name.trim(),
             preferredLanguage = state.preferredLanguage,
+            gender = state.gender,
             weekdayType = state.weekdayType,
             placeName = primaryPlace,
             workplace = state.workplace.trim().ifBlank { state.placeName.trim() },
@@ -374,6 +381,7 @@ class OnboardingViewModel(
         val profile = UserOnboardingProfile(
             name = state.name.trim(),
             preferredLanguage = state.preferredLanguage,
+            gender = state.gender,
             weekdayType = state.weekdayType,
             placeName = primaryPlace,
             workplace = state.workplace.trim().ifBlank { state.placeName.trim() },

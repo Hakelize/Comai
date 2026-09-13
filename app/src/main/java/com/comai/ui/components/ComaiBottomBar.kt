@@ -24,18 +24,21 @@ import com.comai.ui.theme.ElectricTeal
 import com.comai.ui.theme.TextPrimary
 import com.comai.ui.theme.TextSecondary
 
+import androidx.compose.ui.res.stringResource
+import com.comai.R
+
 data class NavItem(
     val route: String,
-    val label: String,
+    val labelRes: Int,
     val icon: ImageVector
 )
 
 val MainNavItems = listOf(
-    NavItem(Routes.HOME, "Home", Icons.Outlined.Home),
-    NavItem(Routes.CHAT, "Chat", Icons.Outlined.ChatBubbleOutline),
-    NavItem(Routes.ROUTINE, "Routine", Icons.Outlined.Schedule),
-    NavItem(Routes.MEMORY, "Memory", Icons.Outlined.Lightbulb),
-    NavItem(Routes.PROFILE, "Profile", Icons.Outlined.Person)
+    NavItem(Routes.HOME, R.string.nav_home, Icons.Outlined.Home),
+    NavItem(Routes.CHAT, R.string.nav_chat, Icons.Outlined.ChatBubbleOutline),
+    NavItem(Routes.ROUTINE, R.string.nav_routine, Icons.Outlined.Schedule),
+    NavItem(Routes.MEMORY, R.string.nav_memory, Icons.Outlined.Lightbulb),
+    NavItem(Routes.PROFILE, R.string.nav_profile, Icons.Outlined.Person)
 )
 
 /**
@@ -74,20 +77,21 @@ fun ComaiBottomBar(
                         }
                     }
                 ) {
+                    val itemLabel = stringResource(item.labelRes)
                     Row(
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             imageVector = item.icon,
-                            contentDescription = item.label,
+                            contentDescription = itemLabel,
                             tint = if (isSelected) ElectricTeal else TextSecondary,
                             modifier = Modifier.size(20.dp)
                         )
                         if (isSelected) {
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = item.label,
+                                text = itemLabel,
                                 color = ElectricTeal,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold
