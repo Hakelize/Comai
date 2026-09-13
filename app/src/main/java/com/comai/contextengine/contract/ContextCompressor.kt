@@ -72,8 +72,13 @@ object ContextCompressor {
         val broadTag = userContext.broadContextTag
         val place = deviceContext.location.locationCategory
         val audio = deviceContext.audio.primaryOutputDevice.name
-
-        return "BroadContext: $broadTag | Place: $place | Activity: $activity | Audio: $audio"
+        val base = "BroadContext: $broadTag | Place: $place | Activity: $activity | Audio: $audio"
+        val dig = deviceContext.digitalActivity
+        return if (dig != null && dig.isAvailable) {
+            "$base | DigitalActivity: ${dig.activityState} (conf=${dig.confidence}, reason=${dig.reason})"
+        } else {
+            base
+        }
     }
 
     private fun determineTaskForContext(

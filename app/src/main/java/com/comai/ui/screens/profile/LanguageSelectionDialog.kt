@@ -14,7 +14,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
+import com.comai.R
 import com.comai.ui.theme.*
 import com.comai.voice.ComaiLanguage
 
@@ -47,7 +49,7 @@ fun LanguageSelectionDialog(
                 horizontalAlignment = Alignment.Start
             ) {
                 Text(
-                    text = "Voice & App Language",
+                    text = stringResource(R.string.lang_dialog_title),
                     color = TextPrimary,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
@@ -56,7 +58,7 @@ fun LanguageSelectionDialog(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = "Select the language you want to speak and hear with Comai.",
+                    text = stringResource(R.string.lang_dialog_sub),
                     color = TextSecondary,
                     fontSize = 13.sp
                 )
@@ -110,7 +112,7 @@ fun LanguageSelectionDialog(
                     onClick = onDismiss,
                     modifier = Modifier.align(Alignment.End)
                 ) {
-                    Text("Close", color = TextSecondary, fontSize = 14.sp)
+                    Text(stringResource(R.string.close), color = TextSecondary, fontSize = 14.sp)
                 }
             }
         }

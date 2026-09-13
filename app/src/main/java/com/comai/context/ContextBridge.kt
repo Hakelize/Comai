@@ -28,7 +28,8 @@ import java.util.concurrent.ConcurrentHashMap
 class ContextBridge(
     private val aiEngine: AIEngine,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
-    private val memoryRepository: com.comai.memory.MemoryRepository? = null
+    private val memoryRepository: com.comai.memory.MemoryRepository? = null,
+    private val memoryContextProvider: com.comai.memory.MemoryContextProvider? = null
 ) : ContextOutputListener {
 
     private val _proactiveEvents = MutableSharedFlow<AIResponse>(extraBufferCapacity = 16)
@@ -83,13 +84,21 @@ class ContextBridge(
         scope.launch {
             try {
                 var contextInput = ContextInputMapper.toContextInput(contractObject)
-                if (contextInput.retrievedData.isNullOrBlank() && memoryRepository != null) {
-                    val relevant = memoryRepository.retrieveRelevantMemories(
+                val provider = memoryContextProvider ?: memoryRepository?.let { com.comai.memory.MemoryContextProvider(it) }
+                if (provider != null) {
+                    val relevant = provider.getFormattedMemoryContext(
                         task = contextInput.task,
                         signals = contextInput.contextSignals
                     )
-                    if (!relevant.isNullOrBlank()) {
-                        contextInput = contextInput.copy(retrievedData = relevant)
+                    val memList = provider.getMemoryContextList(
+                        task = contextInput.task,
+                        signals = contextInput.contextSignals
+                    )
+                    if (!relevant.isNullOrBlank() || memList.isNotEmpty()) {
+                        contextInput = contextInput.copy(
+                            retrievedData = relevant,
+                            memoryContext = memList
+                        )
                     }
                 }
                 Log.i(TAG, "Context mapped: task=${contractObject.task} -> ContextInput")
@@ -121,13 +130,21 @@ class ContextBridge(
         _lastEscalatedContract.value = contract
 
         var contextInput = ContextInputMapper.toContextInput(contract)
-        if (contextInput.retrievedData.isNullOrBlank() && memoryRepository != null) {
-            val relevant = memoryRepository.retrieveRelevantMemories(
+        val provider = memoryContextProvider ?: memoryRepository?.let { com.comai.memory.MemoryContextProvider(it) }
+        if (provider != null) {
+            val relevant = provider.getFormattedMemoryContext(
                 task = contextInput.task,
                 signals = contextInput.contextSignals
             )
-            if (!relevant.isNullOrBlank()) {
-                contextInput = contextInput.copy(retrievedData = relevant)
+            val memList = provider.getMemoryContextList(
+                task = contextInput.task,
+                signals = contextInput.contextSignals
+            )
+            if (!relevant.isNullOrBlank() || memList.isNotEmpty()) {
+                contextInput = contextInput.copy(
+                    retrievedData = relevant,
+                    memoryContext = memList
+                )
             }
         }
         Log.i(TAG, "Context mapped: task=${contract.task} -> ContextInput")

@@ -13,6 +13,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.comai.R
 import com.comai.data.models.ChatMessage
 import com.comai.ui.components.ComaiBottomBar
 import com.comai.ui.components.HomeGreeting
@@ -22,6 +24,7 @@ import com.comai.ui.components.VoiceSubtitle
 import com.comai.ui.navigation.Routes
 import com.comai.ui.screens.chat.ChatViewModel
 import com.comai.ui.theme.*
+import com.comai.voice.ConversationGreetingManager
 import com.comai.voice.VoiceInteractionManager
 import com.comai.voice.VoiceState
 
@@ -39,35 +42,48 @@ fun VoiceHomeScreen(
     // ── Observe user profile for dynamic name ────────────────────────
     val homeUiState by homeViewModel.uiState.collectAsState()
     val userName = homeUiState.profile.name
-    val greetingText = remember(userName) {
-        HomeGreetingUtils.computeGreeting(userName)
-    }
 
-    // ── Observe voice state ──────────────────────────────────────────
-    val voiceState by voiceManager?.state?.collectAsState()
-        ?: remember { mutableStateOf(VoiceState.IDLE) }
-    val partialText by voiceManager?.partialText?.collectAsState()
-        ?: remember { mutableStateOf("") }
-    val rmsDb by voiceManager?.rmsDb?.collectAsState()
-        ?: remember { mutableStateOf(0f) }
-    val errorMessage by voiceManager?.errorMessage?.collectAsState()
-        ?: remember { mutableStateOf(null) }
-
-    // ── Latest AI response ───────────────────────────────────────────
+    // ── Latest AI response & conversation context ────────────────────
     val messages by chatViewModel.messages.collectAsState()
     val initialMessageCount = remember { messages.size }
+    val isReturningConversation = remember(initialMessageCount) { initialMessageCount > 0 }
     val lastAiMessage: ChatMessage? = remember(messages) {
         messages.lastOrNull { !it.isFromUser }
     }
 
-    // ── Greeting Lifecycle: disappears as soon as voice interaction begins ──
+    val preferredLanguage = homeUiState.profile.preferredLanguage
+
+    // Dynamic, context-aware spoken greeting using saved profile name (NEVER hardcoded)
+    val spokenGreeting = remember(userName, preferredLanguage, isReturningConversation) {
+        ConversationGreetingManager.generateGreeting(
+            userName = userName,
+            uiLanguage = preferredLanguage,
+            isReturning = isReturningConversation
+        )
+    }
+
+    val greetingText = remember(userName, preferredLanguage) {
+        HomeGreetingUtils.computeGreeting(userName, preferredLanguage)
+    }
+
+    // ── Observe voice state ──────────────────────────────────────────
+    val idleVoiceStateFlow = remember { kotlinx.coroutines.flow.MutableStateFlow(VoiceState.IDLE) }
+    val emptyPartialTextFlow = remember { kotlinx.coroutines.flow.MutableStateFlow("") }
+    val zeroRmsDbFlow = remember { kotlinx.coroutines.flow.MutableStateFlow(0f) }
+    val nullErrorFlow = remember { kotlinx.coroutines.flow.MutableStateFlow<String?>(null) }
+
+    val voiceState by (voiceManager?.state ?: idleVoiceStateFlow).collectAsState()
+    val partialText by (voiceManager?.partialText ?: emptyPartialTextFlow).collectAsState()
+    val rmsDb by (voiceManager?.rmsDb ?: zeroRmsDbFlow).collectAsState()
+    val errorMessage by (voiceManager?.errorMessage ?: nullErrorFlow).collectAsState()
+
+    // ── Greeting Lifecycle: disappears once user speech / processing begins ──
     var hasUserInteracted by remember { mutableStateOf(false) }
 
     LaunchedEffect(partialText, voiceState, messages.size) {
         if (!hasUserInteracted) {
             if (partialText.isNotBlank() ||
                 voiceState == VoiceState.PROCESSING ||
-                voiceState == VoiceState.SPEAKING ||
                 messages.size > initialMessageCount
             ) {
                 hasUserInteracted = true
@@ -77,11 +93,11 @@ fun VoiceHomeScreen(
 
     // ── State label text ─────────────────────────────────────────────
     val stateLabel = when (voiceState) {
-        VoiceState.IDLE -> "Tap to talk"
-        VoiceState.LISTENING -> "Listening..."
-        VoiceState.PROCESSING -> "Thinking..."
-        VoiceState.SPEAKING -> "Speaking..."
-        VoiceState.ERROR -> "Tap to retry"
+        VoiceState.IDLE -> stringResource(R.string.tap_to_talk)
+        VoiceState.LISTENING -> stringResource(R.string.listening)
+        VoiceState.PROCESSING -> stringResource(R.string.thinking)
+        VoiceState.SPEAKING -> stringResource(R.string.speaking)
+        VoiceState.ERROR -> stringResource(R.string.tap_to_retry)
     }
 
     val stateColor = when (voiceState) {
@@ -92,11 +108,13 @@ fun VoiceHomeScreen(
         VoiceState.ERROR -> ErrorRed
     }
 
-    // Automatically enter listening state when opening Home
+    // Automatically speak greeting once per session then enter listening state when opening Home
+    // Uses homeViewModel.hasInitialGreetingPlayed so configuration changes (screen rotations) do NOT restart greeting
     LaunchedEffect(Unit) {
         homeViewModel.refreshState()
-        if (voiceManager?.state?.value == VoiceState.IDLE) {
-            voiceManager.startListening()
+        if (!homeViewModel.hasInitialGreetingPlayed && voiceManager?.state?.value == VoiceState.IDLE) {
+            homeViewModel.hasInitialGreetingPlayed = true
+            voiceManager.speakGreetingAndListen(spokenGreeting)
         }
     }
 
@@ -191,7 +209,7 @@ fun VoiceHomeScreen(
             VoiceSubtitle(
                 voiceState = voiceState,
                 userSpeech = partialText,
-                aiResponse = lastAiMessage?.content,
+                aiResponse = lastAiMessage?.content ?: if (voiceState == VoiceState.SPEAKING && !hasUserInteracted) spokenGreeting else null,
                 errorMessage = errorMessage,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)

@@ -1,10 +1,22 @@
 package com.comai.ui.screens.chat
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.provider.OpenableColumns
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,10 +29,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -28,22 +39,28 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.Image
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import com.comai.R
 import com.comai.data.models.ChatMessage
+import com.comai.ui.components.ComaiBottomBar
+import com.comai.ui.navigation.Routes
 import com.comai.ui.theme.*
 import com.comai.voice.VoiceInteractionManager
 import com.comai.voice.VoiceState
-import kotlinx.coroutines.launch
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -53,24 +70,112 @@ fun ChatScreen(
     viewModel: ChatViewModel,
     voiceManager: VoiceInteractionManager? = null,
     onBack: (() -> Unit)? = null,
+    onNavigateToHome: () -> Unit = {},
+    onNavigateToRoutine: () -> Unit = {},
+    onNavigateToProfile: () -> Unit = {},
+    onNavigateToMemory: () -> Unit = {},
     onNavigateToAudio: () -> Unit,
-    onNavigateToDashboard: () -> Unit,
-    onNavigateToMemory: () -> Unit = {}
+    onNavigateToDashboard: () -> Unit
 ) {
+    // Lifecycle: Disable TTS and cancel any ongoing speech recognition while user is in the Chat tab
+    DisposableEffect(voiceManager) {
+        viewModel.setChatTabActive(true)
+        voiceManager?.cancel()
+        onDispose {
+            viewModel.setChatTabActive(false)
+        }
+    }
+
+    val context = LocalContext.current
     val messages by viewModel.messages.collectAsState()
     val isTyping by viewModel.isTyping.collectAsState()
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
 
-    val voiceState by voiceManager?.state?.collectAsState() ?: remember { mutableStateOf(VoiceState.IDLE) }
-    val partialText by voiceManager?.partialText?.collectAsState() ?: remember { mutableStateOf("") }
+    val idleVoiceStateFlow = remember { kotlinx.coroutines.flow.MutableStateFlow(VoiceState.IDLE) }
+    val emptyPartialTextFlow = remember { kotlinx.coroutines.flow.MutableStateFlow("") }
+    val voiceState by (voiceManager?.state ?: idleVoiceStateFlow).collectAsState()
+    val partialText by (voiceManager?.partialText ?: emptyPartialTextFlow).collectAsState()
+
+    // ── Media Attachment State ───────────────────────────────────────
+    var attachedMediaUri by remember { mutableStateOf<String?>(null) }
+    var attachedMediaType by remember { mutableStateOf<String?>(null) }
+    var attachedMediaName by remember { mutableStateOf<String?>(null) }
+    var showAttachmentDialog by remember { mutableStateOf(false) }
+    var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
+
+    val takePictureLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && tempCameraUri != null) {
+            attachedMediaUri = tempCameraUri.toString()
+            attachedMediaType = "image"
+            attachedMediaName = "Camera Photo.jpg"
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            val file = File(context.cacheDir, "camera_${System.currentTimeMillis()}.jpg")
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            tempCameraUri = uri
+            takePictureLauncher.launch(uri)
+        } else {
+            Toast.makeText(context, "Camera permission required to capture photos", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val launchCamera = {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+        if (hasPermission) {
+            val file = File(context.cacheDir, "camera_${System.currentTimeMillis()}.jpg")
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            tempCameraUri = uri
+            takePictureLauncher.launch(uri)
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    val pickImageLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            attachedMediaUri = uri.toString()
+            attachedMediaType = "image"
+            attachedMediaName = getFileNameFromUri(context, uri) ?: "Image.jpg"
+        }
+    }
+
+    val pickFileLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            attachedMediaUri = uri.toString()
+            attachedMediaType = "document"
+            attachedMediaName = getFileNameFromUri(context, uri) ?: "Document"
+        }
+    }
 
     // Auto-scroll on new message
     LaunchedEffect(messages.size, isTyping) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
         }
+    }
+
+    if (showAttachmentDialog) {
+        AttachmentSelectionDialog(
+            onDismiss = { showAttachmentDialog = false },
+            onTakePhoto = { launchCamera() },
+            onPickImage = { pickImageLauncher.launch("image/*") },
+            onPickFile = { pickFileLauncher.launch("*/*") }
+        )
     }
 
     Scaffold(
@@ -96,7 +201,7 @@ fun ChatScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.combinedClickable(
                             onClick = { /* normal click */ },
-                            onLongClick = { onNavigateToDashboard() } // Secret override dashboard
+                            onLongClick = { onNavigateToDashboard() } // Developer dashboard
                         )
                     ) {
                         // Comai Robot Avatar
@@ -113,7 +218,7 @@ fun ChatScreen(
 
                         Column {
                             Text(
-                                text = "Comai",
+                                text = "COMAI",
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp
@@ -127,7 +232,7 @@ fun ChatScreen(
                                 )
                                 Spacer(modifier = Modifier.width(5.dp))
                                 Text(
-                                    text = "Ready",
+                                    text = stringResource(R.string.ready),
                                     color = OnlineGreen,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium
@@ -140,42 +245,34 @@ fun ChatScreen(
                     IconButton(onClick = onNavigateToMemory) {
                         Icon(
                             imageVector = Icons.Outlined.Psychology,
-                            contentDescription = "Memories",
-                            tint = SoftPurple,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                    IconButton(onClick = onNavigateToAudio) {
-                        Icon(
-                            imageVector = Icons.Default.Call,
-                            contentDescription = "Voice Mode",
-                            tint = Color(0xFF64B5F6)
-                        )
-                    }
-                    IconButton(onClick = onNavigateToDashboard) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = "Menu / Overrides",
-                            tint = Color(0xFF64B5F6)
+                            contentDescription = stringResource(R.string.chat_memory_tooltip),
+                            tint = ElectricTeal
                         )
                     }
                 }
             )
         },
-        containerColor = DarkBackground,
         bottomBar = {
             Column(
                 modifier = Modifier
+                    .fillMaxWidth()
+                    .background(DarkBackground)
+                    .windowInsetsPadding(WindowInsets.ime)
                     .navigationBarsPadding()
-                    .imePadding()
             ) {
-                AnimatedVisibility(visible = voiceState != VoiceState.IDLE) {
+                // Voice Recognition Status Banner
+                AnimatedVisibility(
+                    visible = voiceState != VoiceState.IDLE,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
                     Surface(
                         color = when (voiceState) {
                             VoiceState.LISTENING -> OnlineGreen.copy(alpha = 0.15f)
                             VoiceState.PROCESSING -> WarmAmber.copy(alpha = 0.15f)
-                            VoiceState.SPEAKING -> UserBubbleColor.copy(alpha = 0.15f)
-                            else -> DarkSurfaceVariant
+                            VoiceState.SPEAKING -> ElectricTeal.copy(alpha = 0.15f)
+                            VoiceState.ERROR -> ErrorRed.copy(alpha = 0.15f)
+                            else -> Color.Transparent
                         },
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier
@@ -204,12 +301,13 @@ fun ChatScreen(
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
+                            val partialOrFallback = partialText.ifBlank { stringResource(R.string.speak_now) }
                             Text(
                                 text = when (voiceState) {
-                                    VoiceState.LISTENING -> "Listening: ${partialText.ifBlank { "Speak now..." }}"
-                                    VoiceState.PROCESSING -> "Processing speech..."
-                                    VoiceState.SPEAKING -> "Speaking... (Tap mic to stop)"
-                                    VoiceState.ERROR -> "Speech recognition error"
+                                    VoiceState.LISTENING -> stringResource(R.string.chat_voice_listening, partialOrFallback)
+                                    VoiceState.PROCESSING -> stringResource(R.string.chat_voice_processing)
+                                    VoiceState.SPEAKING -> stringResource(R.string.chat_voice_speaking)
+                                    VoiceState.ERROR -> stringResource(R.string.chat_voice_error)
                                     else -> ""
                                 },
                                 color = when (voiceState) {
@@ -225,15 +323,75 @@ fun ChatScreen(
                     }
                 }
 
+                // Media Attachment Preview Banner (if selected)
+                if (attachedMediaUri != null) {
+                    Surface(
+                        color = Color(0xFF161E2E),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color(0xFF273148)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = if (attachedMediaType == "image") Icons.Outlined.Image else Icons.Outlined.InsertDriveFile,
+                                contentDescription = null,
+                                tint = ElectricTeal,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = attachedMediaName ?: stringResource(R.string.chat_photo_attached),
+                                color = TextPrimary,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(
+                                onClick = {
+                                    attachedMediaUri = null
+                                    attachedMediaType = null
+                                    attachedMediaName = null
+                                },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = stringResource(R.string.close),
+                                    tint = TextSecondary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 ChatInputBar(
                     text = inputText,
                     onTextChange = { inputText = it },
+                    hasAttachment = attachedMediaUri != null,
                     onSend = {
-                        if (inputText.isNotBlank()) {
-                            viewModel.sendMessage(inputText)
+                        if (inputText.isNotBlank() || attachedMediaUri != null) {
+                            viewModel.sendMessage(
+                                text = inputText,
+                                mediaUri = attachedMediaUri,
+                                mediaType = attachedMediaType,
+                                mediaName = attachedMediaName,
+                                speakResponse = false
+                            )
                             inputText = ""
+                            attachedMediaUri = null
+                            attachedMediaType = null
+                            attachedMediaName = null
                         }
                     },
+                    onAttachClick = { showAttachmentDialog = true },
+                    onCameraClick = { launchCamera() },
                     onMicClick = {
                         when (voiceState) {
                             VoiceState.LISTENING -> voiceManager?.stopListening()
@@ -243,6 +401,24 @@ fun ChatScreen(
                     },
                     voiceState = voiceState
                 )
+
+                // ── Unified Tab Switching Navigation Bar ────────────────
+                // Shows the identical navigation panel as Home/Profile when software keyboard is closed
+                val density = androidx.compose.ui.platform.LocalDensity.current
+                val isKeyboardOpen = WindowInsets.ime.getBottom(density) > 0
+                if (!isKeyboardOpen) {
+                    ComaiBottomBar(
+                        currentRoute = Routes.CHAT,
+                        onNavigate = { targetRoute ->
+                            when (targetRoute) {
+                                Routes.HOME -> onNavigateToHome()
+                                Routes.ROUTINE -> onNavigateToRoutine()
+                                Routes.PROFILE -> onNavigateToProfile()
+                                Routes.MEMORY -> onNavigateToMemory()
+                            }
+                        }
+                    )
+                }
             }
         }
     ) { paddingValues ->
@@ -298,6 +474,15 @@ fun ChatBubble(msg: ChatMessage) {
                 .background(if (isUser) UserBubbleColor else AIBubbleColor)
                 .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
+            // Attached Media (Image or Document)
+            if (msg.mediaUri != null) {
+                MediaAttachmentBubble(
+                    uriString = msg.mediaUri,
+                    mediaType = msg.mediaType,
+                    mediaName = msg.mediaName
+                )
+            }
+
             Text(
                 text = msg.content,
                 color = TextOnBubble,
@@ -331,6 +516,69 @@ fun ChatBubble(msg: ChatMessage) {
 }
 
 @Composable
+fun MediaAttachmentBubble(
+    uriString: String,
+    mediaType: String?,
+    mediaName: String?
+) {
+    val context = LocalContext.current
+    var bitmap by remember(uriString) {
+        mutableStateOf(loadLocalBitmap(context, uriString))
+    }
+
+    if (mediaType == "image" && bitmap != null) {
+        Image(
+            bitmap = bitmap!!,
+            contentDescription = mediaName ?: "Attached Image",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 180.dp)
+                .clip(RoundedCornerShape(12.dp))
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+    } else {
+        Surface(
+            color = Color(0xFF161E2E),
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = if (mediaType == "image") Icons.Outlined.Image else Icons.Outlined.InsertDriveFile,
+                    contentDescription = null,
+                    tint = ElectricTeal,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = mediaName ?: if (mediaType == "image") "Photo Attachment" else "Attached Document",
+                    color = TextPrimary,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+    }
+}
+
+private fun loadLocalBitmap(context: Context, uriString: String): androidx.compose.ui.graphics.ImageBitmap? {
+    return try {
+        val uri = Uri.parse(uriString)
+        context.contentResolver.openInputStream(uri)?.use { stream ->
+            BitmapFactory.decodeStream(stream)?.asImageBitmap()
+        }
+    } catch (_: Exception) {
+        null
+    }
+}
+
+@Composable
 fun TypingIndicatorBubble() {
     Box(
         modifier = Modifier
@@ -338,12 +586,29 @@ fun TypingIndicatorBubble() {
             .background(AIBubbleColor)
             .padding(horizontal = 16.dp, vertical = 10.dp)
     ) {
-        Text(
-            text = "Comai is thinking...",
-            color = TextSecondary,
-            fontSize = 13.sp,
-            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(ElectricTeal)
+            )
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(ElectricTeal.copy(alpha = 0.6f))
+            )
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(ElectricTeal.copy(alpha = 0.3f))
+            )
+        }
     }
 }
 
@@ -351,30 +616,32 @@ fun TypingIndicatorBubble() {
 fun ChatInputBar(
     text: String,
     onTextChange: (String) -> Unit,
+    hasAttachment: Boolean = false,
     onSend: () -> Unit,
+    onAttachClick: () -> Unit,
+    onCameraClick: () -> Unit,
     onMicClick: () -> Unit,
-    voiceState: VoiceState = VoiceState.IDLE
+    voiceState: VoiceState
 ) {
     Surface(
         color = DarkBackground,
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Attachment Icon
+            // [ + / Attachment ] Icon
             IconButton(
-                onClick = { /* future attachments */ },
+                onClick = onAttachClick,
                 modifier = Modifier.size(38.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.AttachFile,
-                    contentDescription = "Attachment",
-                    tint = Color(0xFF2979FF)
+                    contentDescription = "Attach media",
+                    tint = if (hasAttachment) ElectricTeal else Color(0xFF2979FF)
                 )
             }
 
@@ -395,7 +662,7 @@ fun ChatInputBar(
                     Box(modifier = Modifier.weight(1f)) {
                         if (text.isEmpty()) {
                             Text(
-                                text = if (voiceState == VoiceState.LISTENING) "Listening..." else "Message",
+                                text = if (voiceState == VoiceState.LISTENING) stringResource(R.string.listening) else stringResource(R.string.message_hint),
                                 color = if (voiceState == VoiceState.LISTENING) OnlineGreen else TextSecondary,
                                 fontSize = 15.sp
                             )
@@ -411,15 +678,6 @@ fun ChatInputBar(
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
-
-                    Spacer(modifier = Modifier.width(6.dp))
-
-                    Icon(
-                        imageVector = Icons.Outlined.Assignment,
-                        contentDescription = "Notes",
-                        tint = Color(0xFF2979FF),
-                        modifier = Modifier.size(20.dp)
-                    )
                 }
             }
 
@@ -427,7 +685,7 @@ fun ChatInputBar(
 
             // Camera Icon
             IconButton(
-                onClick = { /* camera */ },
+                onClick = onCameraClick,
                 modifier = Modifier.size(38.dp)
             ) {
                 Icon(
@@ -437,8 +695,8 @@ fun ChatInputBar(
                 )
             }
 
-            // Mic or Send Icon
-            if (text.isNotBlank()) {
+            // Send or Mic Icon
+            if (text.isNotBlank() || hasAttachment) {
                 IconButton(
                     onClick = onSend,
                     modifier = Modifier
@@ -480,4 +738,105 @@ fun ChatInputBar(
             }
         }
     }
+}
+
+@Composable
+fun AttachmentSelectionDialog(
+    onDismiss: () -> Unit,
+    onTakePhoto: () -> Unit,
+    onPickImage: () -> Unit,
+    onPickFile: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF141926),
+        title = {
+            Text(stringResource(R.string.chat_attach_title), color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Surface(
+                    color = Color(0xFF1B2336),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            onDismiss()
+                            onTakePhoto()
+                        }
+                ) {
+                    Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.PhotoCamera, null, tint = ElectricTeal, modifier = Modifier.size(22.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text(stringResource(R.string.chat_take_photo), color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+
+                Surface(
+                    color = Color(0xFF1B2336),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            onDismiss()
+                            onPickImage()
+                        }
+                ) {
+                    Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.Image, null, tint = Color(0xFF2979FF), modifier = Modifier.size(22.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text(stringResource(R.string.chat_select_image), color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+
+                Surface(
+                    color = Color(0xFF1B2336),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            onDismiss()
+                            onPickFile()
+                        }
+                ) {
+                    Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.InsertDriveFile, null, tint = WarmAmber, modifier = Modifier.size(22.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text(stringResource(R.string.chat_select_file), color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel), color = TextSecondary)
+            }
+        }
+    )
+}
+
+private fun getFileNameFromUri(context: Context, uri: Uri): String? {
+    var result: String? = null
+    if (uri.scheme == "content") {
+        try {
+            val cursor = context.contentResolver.query(uri, null, null, null, null)
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val index = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (index != -1) {
+                        result = it.getString(index)
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+    }
+    if (result == null) {
+        result = uri.path
+        val cut = result?.lastIndexOf('/')
+        if (cut != null && cut != -1) {
+            result = result?.substring(cut + 1)
+        }
+    }
+    return result
 }

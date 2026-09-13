@@ -1,148 +1,124 @@
-# Comai — AI Companion App
+# Comai
 
-> Privacy-first, voice-driven AI companion built with **Native Android**, **Kotlin**, and **Jetpack Compose**.
-
----
-
-## 📱 Project Overview & Evolution
-
-Comai understands permitted ambient context (time, location, device state, routine), maintains **privacy-first, local-first personal memory**, audits real device capabilities, and interacts through single-tap **push-to-talk voice** backed by Android's native on-device SpeechRecognizer and Text-to-Speech (TTS).
-
-The repository has progressed through three verified, on-device production phases:
-- **Phase 1 (Context Engine Vertical Slice)**: Background context sensing (`ContextForegroundService`) → `SharedContextContract` → `ContextInput` → `AIEngine` / `MockEngine` → UI Chat Bubbles → `TTSManager` speech readout.
-- **Phase 2 (Local Personal Memory)**: Local-first personal memory in Room SQLite (`MemoryEntity`, `MemoryDao`, `MemoryRepository`). Conservative extraction of explicit user statements, relevance-based retrieval injected into `ContextInput.retrievedData`, and strict user control (inspection and one-tap deletion).
-- **Phase 3 (Device Capability & Voice Foundation)**:
-  - **Capability Dashboard**: Audits 20 distinct system capabilities categorizing them strictly into Platform/Hardware, Runtime Permission, Special Access, and Restricted Behavior without non-SDK bypasses or intrusive accessibility services.
-  - **Push-to-Talk Voice Pipeline**: Direct physical pipeline: Single-tap Mic → Android `SpeechRecognizer` (prefers on-device API 31+) → `ChatViewModel.sendMessage()` → `MockEngine` (manual user intent strictly prioritized over ambient context) → `TTSManager` (`UtteranceProgressListener`). Real-time RMS audio streaming connects to the animated Voice Canvas orb.
+Comai is a privacy-first, voice-driven personal AI companion app built natively for Android. It understands a user's daily context—including routines, personal schedules, and device activity—to provide helpful assistance without needing repetitive instructions. All core intelligence, personal memories, and schedules run locally on the physical device without relying on cloud servers.
 
 ---
 
-## 🏗️ Architecture & Package Structure
+## Features
 
-```
-Comai/
-├── app/src/main/
-│   ├── AndroidManifest.xml                     # Foreground service, permissions, package visibility <queries>
-│   ├── java/com/comai/
-│   │   ├── ComaiApplication.kt                 # Application-level singletons (AIEngine, TTS, Room, Context, Voice)
-│   │   ├── MainActivity.kt                     # ComponentActivity, Edge-to-Edge, permission launchers, Navigation
-│   │   ├── capability/                         # Phase 3: Device Capability Audit
-│   │   │   ├── DeviceCapability.kt             # Capability data models & 4-tier category classification
-│   │   │   └── CapabilityAuditor.kt            # Safe system API checks for 20 device/platform capabilities
-│   │   ├── contextengine/                      # Phase 1: Native Context Sensing & Rule Escalation
-│   │   │   ├── context/                        # UserState, WakeSleepDetector, ActivityRecognitionManager
-│   │   │   ├── contract/                       # SharedContextContract, ContractAssembler, ContractValidator
-│   │   │   ├── db/                             # Room DB: UserProfile, DailyLog, CommunityEventDatabase
-│   │   │   ├── rules/                          # RuleEngine & RuleDefinition (deterministic decision matrix)
-│   │   │   ├── service/                        # ContextForegroundService & fallback workers
-│   │   │   └── ContextRepository.kt            # Application-scoped bridge between Context Engine & UI/AI
-│   │   ├── data/
-│   │   │   ├── db/                             # Phase 2: Comai App Room Database
-│   │   │   │   ├── AppDatabase.kt              # Room database definition with schema migrations
-│   │   │   │   └── MemoryDao.kt                # Type-safe Room DAO for local memory persistence
-│   │   │   ├── memory/                         # Phase 2: Local Personal Memory Engine
-│   │   │   │   ├── MemoryEntity.kt             # Schema: key, category, value, confidence, timestamps
-│   │   │   │   ├── MemoryRepository.kt         # Room-backed memory store with relevance query & purge
-│   │   │   │   └── MemoryExtractor.kt          # Conservative parser for explicit user facts & preferences
-│   │   │   └── models/
-│   │   │       └── ChatMessage.kt              # Chat bubble entity with timestamps and role
-│   │   ├── engine/                             # Core AI Engine Abstractions
-│   │   │   ├── AIEngine.kt                     # Shared Kotlin interface for AI inference
-│   │   │   ├── MockEngine.kt                   # Deterministic engine: prioritizes user intent & memory over ambient rules
-│   │   │   └── models/
-│   │   │       ├── ContextInput.kt             # Schema matching Context Engine JSON + retrieved memories
-│   │   │       └── AIResponse.kt               # Structured typed response schema
-│   │   ├── tts/
-│   │   │   └── TTSManager.kt                   # Android TextToSpeech wrapper with UtteranceProgressListener
-│   │   ├── voice/                              # Phase 3: Push-to-Talk Voice Foundation
-│   │   │   └── VoiceInteractionManager.kt      # Single-tap push-to-talk, on-device recognition, RMS streaming
-│   │   └── ui/
-│   │       ├── navigation/NavGraph.kt          # Compose navigation (Chat, Audio, Dashboard, Capability)
-│   │       ├── screens/
-│   │       │   ├── audio/AudioCanvasScreen.kt  # Audio Canvas with dynamic RMS-driven pulsing orb
-│   │       │   ├── capability/                 # Developer Capability Audit Dashboard (20 capabilities)
-│   │       │   ├── chat/                       # Comai Chat screen, speech state banner, push-to-talk mic bar
-│   │       │   └── dashboard/                  # Developer Override Console (time & scenario simulator)
-│   │       └── theme/                          # Material 3 dark palette, typography, system bars
-│   └── res/
-│       ├── drawable/comai_avatar.png           # Comai robot avatar
-│       ├── values/                             # Strings, themes, colors
-│       └── mipmap/                             # Launcher icons
-├── build.gradle.kts                            # AGP 8.5.0, Kotlin 1.9.24, Room, Coroutines, Compose BOM
-└── gradle.properties                           # AndroidX, JVM configuration
+- 🎙️ **Voice Interaction** – Push-to-talk voice capture using Android's native `SpeechRecognizer`, featuring real-time audio wave visualization (animated voice orb) and dynamic spoken greetings.
+- 💬 **Chat** – Full-screen conversational text interface with message bubbles, typing indicators, quick suggestion chips, and edge-to-edge keyboard support.
+- 👤 **Personal Profile** – Store and edit personal details (name, gender, occupation, routine timings) and app preferences safely on the device.
+- 📅 **Personal Schedule** – Add, edit, and toggle daily tasks and reminders with custom timing.
+- 🔔 **Notifications & Alarms** – Choose between standard notifications or high-priority alarms with sound using Android `AlarmManager`.
+- 🩸 **Menstrual Cycle Tracking** – Private, on-device cycle tracking and period estimation inside Personal Schedule, dynamically displayed for female profiles.
+- 🌐 **Multilingual Voice** – Built-in support for 6 language profiles: English (India), Tamil, Telugu, Hindi, Malayalam, and Tanglish (Tamil-English code switching).
+- 🧠 **Context Awareness** – Background context engine tracks routine baselines (wake, commute, return, sleep), detects schedule deviations, and calculates confidence scores.
+- 📱 **Digital Activity** – Tracks daily screen time, app usage categories, top-used apps, and awake/inactive device periods using Android `UsageStatsManager`.
+- 🧠 **AI Assistant** – Intelligent assistant that prioritizes user intent and retrieves saved personal facts to generate structured responses.
+- 🔒 **Local-first Privacy** – User profile data, memories, schedules, and activity statistics remain strictly on the phone in local SQLite storage.
+
+---
+
+## Main Screens
+
+- **Home (Voice Home)** – Main hub with the animated voice orb, contextual spoken greeting, live speech subtitles, and quick mode navigation.
+- **Chat** – Messaging screen with conversation history, push-to-talk voice input bar, and clear memory shortcuts.
+- **Profile** – User profile management for name, gender, routine timings, voice language selection, and permission status.
+- **Personal Schedule** – Daily routine timeline, custom tasks, reminder toggles (`[ Notification ]` vs `[ Alarm ]`), and cycle tracking.
+- **Digital Activity** – Dashboard showing total screen time, app category breakdown, top apps, and device inactivity intervals.
+- **Onboarding** – Multi-step setup wizard covering feature introduction, language choice, voice setup, routine input, and privacy pledges.
+- **Developer & RAM Dashboard** – Diagnostic console displaying real-time sensor context, rule triggers, confidence ratings, and test scenario overrides.
+- **Device Capability Audit** – System audit screen categorizing 20 Android platform capabilities across hardware, runtime permissions, and system boundaries.
+- **Audio Canvas** – Dedicated voice screen with a pulsing visual orb driven by real-time speech sound levels.
+
+---
+
+## How Comai Works
+
+```text
+User (Voice or Text)
+        │
+        ▼
+Input Processing (SpeechRecognizer / Text Input)
+        │
+        ▼
+Context & Memory Synthesis (Local Routine + Screen Activity + Saved Facts)
+        │
+        ▼
+AI Engine Processing (Rule Evaluation & Structured Response Generation)
+        │
+        ▼
+Output Action (Android TTS Voice Readout / Chat UI / Alarm & Notification)
 ```
 
 ---
 
-## 🛠️ Prerequisites & Environment
+## Technology Used
 
-1. **Android Studio**: Android Studio Ladybug (2024.2+) or later.
-2. **JDK**: **Java 17** (ensure `JAVA_HOME` points to JDK 17).
-3. **Android SDK**: Min SDK `29` (Android 10+), Compile / Target SDK `34` (Android 14+).
-4. **Tested Hardware**: Verified on physical **Samsung Galaxy A15 5G** (`SM-A156E`, MediaTek Dimensity 6100+, 8GB RAM, Android 14/16 Preview API 36).
-
----
-
-## 🚀 How to Build, Test, and Run
-
-### 1. Build and Run Automated Tests
-Run the comprehensive unit test suite (Context Engine, Local Memory, Voice Foundation, and AI Engine pipeline):
-```powershell
-$env:JAVA_HOME = "C:\Path\To\Java17"
-.\gradlew.bat test
-```
-*Current test status: 36/36 unit tests passing across all suites.*
-
-### 2. Assemble Debug APK
-```powershell
-.\gradlew.bat assembleDebug
-```
-The compiled APK is generated at:
-`app/build/outputs/apk/debug/app-debug.apk`
-
-### 3. Install on Connected Device
-```powershell
-adb install -r app\build\outputs\apk\debug\app-debug.apk
-adb shell am start -n com.comai/.MainActivity
-```
+- **Language & Platform**: Kotlin, Android (Min SDK 29, Target SDK 34)
+- **UI Framework**: Jetpack Compose, Material 3, Material Icons Extended
+- **Architecture**: Android Architecture Components, ViewModel, Navigation Compose, Coroutines & Flow
+- **Local Storage**: SQLite via Room Database 2.6.1 (with KSP), Android SharedPreferences
+- **Speech & Audio**: Android `SpeechRecognizer` (on-device preferred API 31+), Android `TextToSpeech` (TTS)
+- **Scheduling & Alarms**: Android `AlarmManager` (`SCHEDULE_EXACT_ALARM`), `NotificationManager` (Standard and Alarm audio channels)
+- **Background & Monitoring**: Android Foreground Service (`specialUse|dataSync`), `WorkManager`, `UsageStatsManager`, `AppOpsManager`
+- **Data Serialization**: Google Gson, Kotlinx Serialization
+- **Edge AI Integration**: Google MediaPipe GenAI LLM Inference SDK (`tasks-genai:0.10.35`) for LiteRT-LM models
 
 ---
 
-## 🌟 Key Feature Modules
+## Privacy
 
-### 1. Push-to-Talk Voice Pipeline (Phase 3)
-- **Single-Tap Mic Button**: Positioned in the chat input bar. One tap activates speech recognition; automatically switches off when speech finishes.
-- **Audio Feedback Loop Protection**: Automatically halts active TTS speech when the mic is engaged.
-- **On-Device Speech Recognition**: Utilizes `SpeechRecognizer.createOnDeviceSpeechRecognizer(context)` when available on API 31+ for privacy and low latency.
-- **Boundary Logging**: Emits structured logcat events (`MIC_REQUESTED`, `MIC_PERMISSION_GRANTED`, `SPEECH_RECOGNIZER_CREATED`, `MIC_STARTED`, `LISTENING_STARTED`, `AUDIO_CAPTURE_STARTED`, `TEXT_SUBMITTED`, `TTS_STARTED`, `TTS_COMPLETED`).
-- **Dynamic Voice Orb**: The Voice Canvas screen (`AudioCanvasScreen`) animates in real-time driven by RMS sound pressure levels (`onRmsChanged`).
-
-### 2. Privacy-First Local Memory (Phase 2)
-- **Zero Cloud Transmission**: All memories reside strictly in the app's encrypted local SQLite database via Room (`AppDatabase`).
-- **Conservative Fact Extraction**: Stored facts require explicit, persistent intent (e.g. *"I work at Tech Hub Office"*, *"I usually leave work around 5:30"*). Transitory or uncertain statements are discarded.
-- **Relevance Retrieval**: Relevant memories are queried using token relevance and injected into `ContextInput.retrievedData` before the AI engine evaluates the prompt.
-- **User Transparency & Deletion**:
-  - Asking *"what do you know about me"* or *"what do you recall"* prints stored facts.
-  - Sending *"forget my memory"* or *"clear memory"* permanently wipes local memory records.
-
-### 3. Device Capability Audit Dashboard (Phase 3)
-- Accessible via the top bar menu or route `Routes.CAPABILITY`.
-- Categorizes 20 system capabilities across 4 transparent tiers:
-  1. **Platform / Hardware**: Microphone, SpeechRecognizer, On-Device Recognizer, TTS, Battery, Network, Headphones, Navigation intent.
-  2. **Runtime Permission**: Fine/Coarse Location, Background Location, Activity Recognition, Bluetooth, Calendar, Contacts.
-  3. **Special User Access**: Usage Stats (`PACKAGE_USAGE_STATS`), Notification Listener (`BIND_NOTIFICATION_LISTENER_SERVICE`).
-  4. **System Restrictions**: Background execution boundaries and non-intrusive Accessibility audit.
-- Zero non-SDK / hidden API bypasses; no unauthorized background services.
-
-### 4. Deterministic Context Engine (Phase 1)
-- Runs a low-overhead foreground service (`ContextForegroundService`).
-- Senses user activity and time/location state, producing a strictly validated `SharedContextContract`.
-- Directly escalates contextual events into the chat timeline accompanied by TTS voice notifications.
+- **Push-to-Talk Only**: Microphone capture activates only when the user explicitly taps the mic or orb. There is no background audio recording or always-on listening.
+- **On-Device Storage**: Personal profiles, chat messages, memories, schedules, and health data are stored locally in Room SQLite database and SharedPreferences.
+- **Zero Cloud Dependency**: Critical-path operations, context detection, and voice interactions run directly on the physical device without sending personal data to external servers.
+- **Safe System APIs**: Device activity is read using standard Android `UsageStatsManager` permissions without using intrusive accessibility services or non-SDK workarounds.
 
 ---
 
-## 🔒 Privacy & Android Restriction Guarantees
+## Project Status
 
-- **No Always-On Microphone**: Comai operates strictly on explicit user push-to-talk. It does not record audio in the background or maintain passive wake-word listeners.
-- **No Intrusive Accessibility Services**: Accessibility capabilities are audited for system state only; no service is registered or active.
-- **No Cloud AI Transmission**: In-flight queries and local memory never leave the physical device.
+### Implemented:
+- Push-to-talk voice pipeline with audio wave animations, dynamic greetings, and feedback loop prevention.
+- Conversational chat UI with keyboard IME handling and message bubble history.
+- Multi-step onboarding flow and editable user profile management.
+- Personal Schedule management with exact `AlarmManager` integration and notification/alarm selection.
+- Female-specific Menstrual Cycle tracking card and local calculator.
+- Multilingual voice support across 6 Indian and English language profiles.
+- Digital activity intelligence (screen time, top apps, awake/inactive state detection).
+- Unified Room SQLite database (`comai_core_db`) for profiles, daily logs, personal memories, and proactive events.
+- Device capability audit dashboard covering 20 platform features.
+
+### Partially Implemented:
+- **On-Device LLM (MediaPipe / Gemma LiteRT-LM)**: MediaPipe GenAI library is integrated and the GPU initialization/benchmarking tester (`GemmaGpuTester`) is implemented. The active production app currently runs the deterministic `MockEngine` for stability and offline testing.
+- **Community Event Database**: SQLite database schema and DAO exist for offline community events, but live event data ingestion is pending.
+
+---
+
+## Setup
+
+### Prerequisites
+- Android Studio Ladybug (2024.2+) or later
+- JDK 17 (Java 17)
+- Android device or emulator running Android 10 (API 29) or higher
+
+### Build & Run
+1. Open the project root in Android Studio or terminal.
+2. Build the debug APK:
+   ```bash
+   ./gradlew assembleDebug
+   ```
+   *(On Windows PowerShell: `.\gradlew.bat assembleDebug`)*
+3. Install onto a connected Android device:
+   ```bash
+   adb install -r app/build/outputs/apk/debug/app-debug.apk
+   ```
+
+---
+
+## Team
+
+- **Rakesh** – Frontend Lead (UI, Jetpack Compose, Voice Interaction, Screens)
+- **Ram** – Data & Logic Lead (Context Engine, Background Sensing, Rule Matrix, Room Database)
+- **Harish** – Edge AI Lead (MediaPipe Setup, On-Device Model Compilation & GPU Benchmarking)

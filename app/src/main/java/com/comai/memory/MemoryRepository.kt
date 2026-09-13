@@ -80,22 +80,31 @@ class MemoryRepository(
     }
 
     /**
-     * Retrieves relevant memories tailored specifically to the given task or context signals.
-     * Formats output compactly to avoid dumping the whole database into AI input.
+     * Retrieves structured list of relevant memories tailored specifically to the given task or context signals.
      */
-    suspend fun retrieveRelevantMemories(task: String, signals: ContextSignals? = null): String? {
+    suspend fun getRelevantMemoriesList(task: String, signals: ContextSignals? = null): List<Memory> {
         val lowerTask = task.lowercase(Locale.ROOT)
         val allMemories = memoryDao.getAll()
-        if (allMemories.isEmpty()) return null
+        if (allMemories.isEmpty()) return emptyList()
 
         val isBroadRecall = lowerTask.contains("remember") ||
                 lowerTask.contains("know about me") ||
                 lowerTask.contains("what do you know") ||
-                lowerTask.contains("my memories")
+                lowerTask.contains("my memories") ||
+                lowerTask.contains("recall") ||
+                lowerTask.contains("who am i") ||
+                lowerTask.contains("my preferences") ||
+                lowerTask.contains("about me") ||
+                lowerTask.contains("myself")
+
+        if (isBroadRecall) {
+            return allMemories
+        }
 
         val isDepartureQuery = lowerTask.contains("leave work") ||
                 lowerTask.contains("usual departure") ||
                 lowerTask.contains("leave office") ||
+                lowerTask.contains("leave college") ||
                 lowerTask.contains("what time do i")
 
         val isOvertimeOrCommute = lowerTask.contains("overtime") ||
@@ -104,44 +113,55 @@ class MemoryRepository(
                 (signals?.location?.equals("office", ignoreCase = true) == true) ||
                 (signals?.routineDeviation == true)
 
-        val relevant = when {
-            isBroadRecall -> {
-                // Broad personal memory retrieval
-                allMemories
-            }
+        return when {
             isDepartureQuery -> {
-                // Only departure-related memory
-                allMemories.filter { it.key == "preferred_work_departure" }
+                allMemories.filter { it.key.startsWith("preferred_") && it.key.endsWith("_departure") }
             }
             isOvertimeOrCommute -> {
-                // Workplace and departure context
-                allMemories.filter { it.key == "preferred_work_departure" || it.key == "workplace" }
+                allMemories.filter { (it.key.startsWith("preferred_") && it.key.endsWith("_departure")) || it.key == "workplace" }
             }
             lowerTask.contains("music") -> {
                 allMemories.filter { it.key == "after_work_music" }
             }
+            lowerTask.contains("programming") || lowerTask.contains("language") || lowerTask.contains("python") || lowerTask.contains("code") -> {
+                allMemories.filter { it.key.contains("programming") || it.key.contains("language") || it.value.contains("Python", ignoreCase = true) }
+            }
+            lowerTask.contains("college") || lowerTask.contains("study") -> {
+                allMemories.filter { it.key == "college" || it.key.contains("college") }
+            }
+            lowerTask.contains("food") || lowerTask.contains("eat") -> {
+                allMemories.filter { it.key == "favorite_food" || it.key.contains("food") }
+            }
             else -> {
-                // Do not dump unrelated records into random tasks
-                emptyList()
+                val taskTokens = lowerTask.split("\\W+".toRegex()).filter { it.length >= 3 }
+                val matches = allMemories.filter { mem ->
+                    val memText = "${mem.key} ${mem.value}".lowercase(Locale.ROOT)
+                    taskTokens.any { token -> memText.contains(token) }
+                }
+                matches
             }
         }
+    }
 
+    /**
+     * Retrieves relevant memories tailored specifically to the given task or context signals.
+     * Formats output compactly to avoid dumping the whole database into AI input.
+     */
+    suspend fun retrieveRelevantMemories(task: String, signals: ContextSignals? = null): String? {
+        val relevant = getRelevantMemoriesList(task, signals)
         if (relevant.isEmpty()) return null
 
         // Compact, structured formatting
         val preferences = relevant.filter { it.type == "PREFERENCE" }
         val context = relevant.filter { it.type == "CONTEXT" }
         val personal = relevant.filter { it.type == "PERSONAL_KNOWLEDGE" }
+        val other = relevant.filter { it.type != "PREFERENCE" && it.type != "CONTEXT" && it.type != "PERSONAL_KNOWLEDGE" }
 
         val sb = StringBuilder()
         if (preferences.isNotEmpty()) {
             sb.append("Preferences:\n")
             for (p in preferences) {
-                when (p.key) {
-                    "preferred_work_departure" -> sb.append("- Usually leaves work around ${p.value}\n")
-                    "after_work_music" -> sb.append("- Likes ${p.value} music after work\n")
-                    else -> sb.append("- ${p.key}: ${p.value}\n")
-                }
+                sb.append("- ").append(p.toDisplayString()).append("\n")
             }
         }
 
@@ -149,10 +169,7 @@ class MemoryRepository(
             if (sb.isNotEmpty()) sb.append("\n")
             sb.append("Context:\n")
             for (c in context) {
-                when (c.key) {
-                    "workplace" -> sb.append("- Workplace: ${c.value}\n")
-                    else -> sb.append("- ${c.key}: ${c.value}\n")
-                }
+                sb.append("- ").append(c.toDisplayString()).append("\n")
             }
         }
 
@@ -160,7 +177,15 @@ class MemoryRepository(
             if (sb.isNotEmpty()) sb.append("\n")
             sb.append("Personal Knowledge:\n")
             for (k in personal) {
-                sb.append("- ${k.key}: ${k.value}\n")
+                sb.append("- ").append(k.toDisplayString()).append("\n")
+            }
+        }
+
+        if (other.isNotEmpty()) {
+            if (sb.isNotEmpty()) sb.append("\n")
+            sb.append("Other Information:\n")
+            for (o in other) {
+                sb.append("- ").append(o.toDisplayString()).append("\n")
             }
         }
 
@@ -171,3 +196,4 @@ class MemoryRepository(
         private const val TAG = "MemoryRepository"
     }
 }
+

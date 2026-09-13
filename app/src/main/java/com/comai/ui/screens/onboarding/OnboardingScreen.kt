@@ -52,13 +52,16 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.comai.ui.components.SiriVoiceOrb
 import com.comai.ui.theme.*
+import androidx.compose.ui.res.stringResource
+import com.comai.R
 import com.comai.voice.ComaiLanguage
 import com.comai.voice.VoiceState
 
 @Composable
 fun OnboardingScreen(
     viewModel: OnboardingViewModel,
-    onOnboardingFinished: (ComaiLanguage) -> Unit
+    onOnboardingFinished: (ComaiLanguage) -> Unit,
+    onLanguageChanged: (ComaiLanguage) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -197,7 +200,10 @@ fun OnboardingScreen(
                             )
                             OnboardingStep.CHOOSE_LANGUAGE -> ChooseLanguageStepView(
                                 selectedLanguage = uiState.preferredLanguage,
-                                onSelectLanguage = { viewModel.updateLanguage(it) },
+                                onSelectLanguage = { lang ->
+                                    viewModel.updateLanguage(lang)
+                                    onLanguageChanged(lang)
+                                },
                                 onContinue = { viewModel.nextStep() }
                             )
                             OnboardingStep.VOICE_SETUP -> VoiceSetupStepView(
@@ -209,6 +215,7 @@ fun OnboardingScreen(
                             )
                             OnboardingStep.PROFILE_AND_ROUTINE -> ProfileAndRoutineStepView(
                                 name = uiState.name,
+                                gender = uiState.gender,
                                 weekdayType = uiState.weekdayType,
                                 workplace = uiState.workplace,
                                 college = uiState.college,
@@ -217,7 +224,6 @@ fun OnboardingScreen(
                                 leaveHomeTime = uiState.leaveHomeTime,
                                 returnHomeTime = uiState.returnHomeTime,
                                 sleepTime = uiState.sleepTime,
-                                travelMode = uiState.travelMode,
                                 nameError = uiState.nameError,
                                 workplaceError = uiState.workplaceError,
                                 collegeError = uiState.collegeError,
@@ -227,6 +233,7 @@ fun OnboardingScreen(
                                 sleepTimeError = uiState.sleepTimeError,
                                 generalError = uiState.generalError,
                                 onNameChange = { viewModel.updateName(it) },
+                                onGenderChange = { viewModel.updateGender(it) },
                                 onWeekdayTypeChange = { viewModel.updateWeekdayType(it) },
                                 onWorkplaceChange = { viewModel.updateWorkplace(it) },
                                 onCollegeChange = { viewModel.updateCollege(it) },
@@ -235,7 +242,6 @@ fun OnboardingScreen(
                                 onLeaveHomeTimeChange = { viewModel.updateLeaveHomeTime(it) },
                                 onReturnHomeTimeChange = { viewModel.updateReturnHomeTime(it) },
                                 onSleepTimeChange = { viewModel.updateSleepTime(it) },
-                                onTravelModeChange = { viewModel.updateTravelMode(it) },
                                 onContinue = { viewModel.validateProfileAndProceed() }
                             )
                             OnboardingStep.LOCATION_SETUP -> LocationSetupStepView(
@@ -287,7 +293,7 @@ private fun WelcomeStepView(onGetStarted: () -> Unit) {
         Spacer(modifier = Modifier.height(36.dp))
 
         Text(
-            text = "Meet Comai",
+            text = stringResource(R.string.ob_welcome_title),
             color = TextPrimary,
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
@@ -297,7 +303,7 @@ private fun WelcomeStepView(onGetStarted: () -> Unit) {
         Spacer(modifier = Modifier.height(12.dp))
 
         Text(
-            text = "Your personal AI companion that learns your routine, understands your day, and helps you at the right time.",
+            text = stringResource(R.string.ob_welcome_desc),
             color = TextSecondary,
             fontSize = 15.sp,
             lineHeight = 22.sp,
@@ -316,7 +322,7 @@ private fun WelcomeStepView(onGetStarted: () -> Unit) {
                 .height(52.dp)
         ) {
             Text(
-                text = "Get Started",
+                text = stringResource(R.string.btn_get_started),
                 color = DarkBackground,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
@@ -338,7 +344,7 @@ private fun WhatComaiDoesStepView(onContinue: () -> Unit) {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "What Comai Can Do",
+            text = stringResource(R.string.ob_features_title),
             color = TextPrimary,
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold
@@ -347,7 +353,7 @@ private fun WhatComaiDoesStepView(onContinue: () -> Unit) {
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "A companion that understands your day and fits into your life.",
+            text = stringResource(R.string.ob_features_sub),
             color = TextSecondary,
             fontSize = 14.sp,
             textAlign = TextAlign.Center
@@ -357,24 +363,24 @@ private fun WhatComaiDoesStepView(onContinue: () -> Unit) {
 
         FeatureCard(
             icon = Icons.Outlined.Schedule,
-            title = "Comai gets to know your routine",
-            description = "Over time, Comai learns things like your usual schedule, places you visit, and everyday habits."
+            title = stringResource(R.string.ob_f1_title),
+            description = stringResource(R.string.ob_f1_desc)
         )
 
         Spacer(modifier = Modifier.height(14.dp))
 
         FeatureCard(
             icon = Icons.Outlined.Lightbulb,
-            title = "Comai remembers what matters",
-            description = "You can tell Comai what you want it to remember, and you stay in control of your memories."
+            title = stringResource(R.string.ob_f2_title),
+            description = stringResource(R.string.ob_f2_desc)
         )
 
         Spacer(modifier = Modifier.height(14.dp))
 
         FeatureCard(
             icon = Icons.Outlined.NotificationsActive,
-            title = "Comai helps when things change",
-            description = "If something is different from your usual routine, Comai can check in and help."
+            title = stringResource(R.string.ob_f3_title),
+            description = stringResource(R.string.ob_f3_desc)
         )
 
         Spacer(modifier = Modifier.height(36.dp))
@@ -388,7 +394,7 @@ private fun WhatComaiDoesStepView(onContinue: () -> Unit) {
                 .height(52.dp)
         ) {
             Text(
-                text = "Continue",
+                text = stringResource(R.string.btn_continue),
                 color = DarkBackground,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
@@ -468,7 +474,7 @@ private fun ChooseLanguageStepView(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "How would you like to talk to Comai?",
+            text = stringResource(R.string.ob_lang_title),
             color = TextPrimary,
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
@@ -478,7 +484,7 @@ private fun ChooseLanguageStepView(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Choose the language you feel most comfortable speaking.",
+            text = stringResource(R.string.ob_lang_sub),
             color = TextSecondary,
             fontSize = 14.sp,
             textAlign = TextAlign.Center
@@ -542,7 +548,7 @@ private fun ChooseLanguageStepView(
                 .height(52.dp)
         ) {
             Text(
-                text = "Continue",
+                text = stringResource(R.string.btn_continue),
                 color = DarkBackground,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
@@ -573,7 +579,7 @@ private fun VoiceSetupStepView(
         Spacer(modifier = Modifier.height(28.dp))
 
         Text(
-            text = "Voice Setup",
+            text = stringResource(R.string.ob_voice_title),
             color = TextPrimary,
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold
@@ -582,7 +588,7 @@ private fun VoiceSetupStepView(
         Spacer(modifier = Modifier.height(10.dp))
 
         Text(
-            text = "Talk to Comai naturally. You can use your voice whenever you want.",
+            text = stringResource(R.string.ob_voice_sub),
             color = TextSecondary,
             fontSize = 15.sp,
             lineHeight = 22.sp,
@@ -609,7 +615,7 @@ private fun VoiceSetupStepView(
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = if (isGranted) "Microphone Enabled" else "Ready to configure",
+                    text = if (isGranted) stringResource(R.string.profile_perm_granted) else stringResource(R.string.ready),
                     color = if (isGranted) OnlineGreen else TextPrimary,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
@@ -630,7 +636,7 @@ private fun VoiceSetupStepView(
                     .height(52.dp)
             ) {
                 Text(
-                    text = "Enable Microphone",
+                    text = stringResource(R.string.ob_voice_btn),
                     color = DarkBackground,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
@@ -666,6 +672,7 @@ private fun VoiceSetupStepView(
 @Composable
 private fun ProfileAndRoutineStepView(
     name: String,
+    gender: String = "Prefer not to say",
     weekdayType: String,
     workplace: String,
     college: String,
@@ -674,7 +681,6 @@ private fun ProfileAndRoutineStepView(
     leaveHomeTime: String,
     returnHomeTime: String,
     sleepTime: String,
-    travelMode: String,
     nameError: String? = null,
     workplaceError: String? = null,
     collegeError: String? = null,
@@ -684,6 +690,7 @@ private fun ProfileAndRoutineStepView(
     sleepTimeError: String? = null,
     generalError: String? = null,
     onNameChange: (String) -> Unit,
+    onGenderChange: (String) -> Unit = {},
     onWeekdayTypeChange: (String) -> Unit,
     onWorkplaceChange: (String) -> Unit,
     onCollegeChange: (String) -> Unit,
@@ -692,11 +699,9 @@ private fun ProfileAndRoutineStepView(
     onLeaveHomeTimeChange: (String) -> Unit,
     onReturnHomeTimeChange: (String) -> Unit,
     onSleepTimeChange: (String) -> Unit,
-    onTravelModeChange: (String) -> Unit,
     onContinue: () -> Unit
 ) {
     val weekdayOptions = listOf("Work", "College", "Both", "Other")
-    val travelOptions = listOf("Walk", "Bike", "Car", "Public transport", "Other")
 
     Column(
         modifier = Modifier
@@ -783,6 +788,36 @@ private fun ProfileAndRoutineStepView(
                 color = Color(0xFFE57373),
                 fontSize = 12.sp
             )
+        }
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        // Gender (Personal Details)
+        val genderOptions = listOf("Male", "Female", "Prefer not to say")
+        Text("Gender", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            genderOptions.forEach { option ->
+                val isSelected = option.equals(gender, ignoreCase = true)
+                Surface(
+                    color = if (isSelected) ElectricTeal else DarkSurfaceVariant,
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.clickable { onGenderChange(option) }
+                ) {
+                    Text(
+                        text = option,
+                        color = if (isSelected) DarkBackground else TextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(18.dp))
@@ -1084,35 +1119,6 @@ private fun ProfileAndRoutineStepView(
             }
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
-
-        // 5. Travel Mode (Optional)
-        Text("Usual mode of travel (Optional)", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            travelOptions.forEach { option ->
-                val isSelected = option == travelMode
-                Surface(
-                    color = if (isSelected) ElectricTeal else DarkSurfaceVariant,
-                    shape = RoundedCornerShape(20.dp),
-                    modifier = Modifier.clickable { onTravelModeChange(option) }
-                ) {
-                    Text(
-                        text = option,
-                        color = if (isSelected) DarkBackground else TextPrimary,
-                        fontSize = 13.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
-                    )
-                }
-            }
-        }
-
         Spacer(modifier = Modifier.height(28.dp))
 
         Button(
@@ -1406,7 +1412,7 @@ private fun FinishStepView(onLaunch: () -> Unit) {
         Spacer(modifier = Modifier.height(32.dp))
 
         Text(
-            text = "You're all set.",
+            text = stringResource(R.string.ob_finish_title),
             color = TextPrimary,
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
@@ -1416,7 +1422,7 @@ private fun FinishStepView(onLaunch: () -> Unit) {
         Spacer(modifier = Modifier.height(12.dp))
 
         Text(
-            text = "Comai is ready to get to know your routine.",
+            text = stringResource(R.string.ob_finish_desc),
             color = TextSecondary,
             fontSize = 16.sp,
             textAlign = TextAlign.Center
@@ -1433,7 +1439,7 @@ private fun FinishStepView(onLaunch: () -> Unit) {
                 .height(52.dp)
         ) {
             Text(
-                text = "Go to Comai",
+                text = stringResource(R.string.ob_finish_btn),
                 color = DarkBackground,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold

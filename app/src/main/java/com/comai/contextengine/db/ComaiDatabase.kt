@@ -24,9 +24,11 @@ import kotlinx.coroutines.launch
         PersonalizationState::class,
         Memory::class,
         ContextLogEntity::class,
-        ProactiveEventEntity::class
+        ProactiveEventEntity::class,
+        com.comai.digitalactivity.data.AppLimitEntity::class,
+        com.comai.digitalactivity.data.DailyActivitySummaryEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class ComaiDatabase : RoomDatabase() {
@@ -38,6 +40,8 @@ abstract class ComaiDatabase : RoomDatabase() {
     abstract fun memoryDao(): MemoryDao
     abstract fun contextLogDao(): ContextLogDao
     abstract fun proactiveEventDao(): ProactiveEventDao
+    abstract fun appLimitDao(): com.comai.digitalactivity.data.AppLimitDao
+    abstract fun dailyActivityDao(): com.comai.digitalactivity.data.DailyActivitySummaryDao
 
     companion object {
         const val DATABASE_NAME = "comai_core_db"
@@ -115,6 +119,37 @@ abstract class ComaiDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `app_limits` (
+                        `packageName` TEXT NOT NULL PRIMARY KEY,
+                        `appName` TEXT NOT NULL,
+                        `dailyLimitMinutes` INTEGER NOT NULL,
+                        `isEnabled` INTEGER NOT NULL DEFAULT 1,
+                        `lastNotifiedDate` TEXT NOT NULL DEFAULT '',
+                        `createdAtMs` INTEGER NOT NULL DEFAULT 0
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `daily_activity_summaries` (
+                        `date` TEXT NOT NULL PRIMARY KEY,
+                        `totalScreenTimeMinutes` INTEGER NOT NULL,
+                        `firstActiveTimeMs` INTEGER NOT NULL,
+                        `lastActiveTimeMs` INTEGER NOT NULL,
+                        `topPackageName` TEXT NOT NULL,
+                        `topCategory` TEXT NOT NULL,
+                        `inferredWakeTimeMs` INTEGER,
+                        `inferredSleepTimeMs` INTEGER
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun getInstance(context: Context): ComaiDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -122,7 +157,7 @@ abstract class ComaiDatabase : RoomDatabase() {
                     ComaiDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .fallbackToDestructiveMigration()
                     .addCallback(DatabaseCallback(context))
                     .build()

@@ -25,6 +25,10 @@ android {
         ksp {
             arg("room.schemaLocation", "$projectDir/schemas")
         }
+
+        ndk {
+            abiFilters.addAll(listOf("arm64-v8a"))
+        }
     }
 
     buildTypes {
@@ -95,6 +99,10 @@ dependencies {
 
     // Location & Activity Recognition
     implementation("com.google.android.gms:play-services-location:21.1.0")
+
+    // Offline Maps: osmdroid + OpenStreetMap (no API key required)
+    // License: Apache 2.0 | Attribution: © OpenStreetMap contributors
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
 
     // Room
     val roomVersion = "2.6.1"

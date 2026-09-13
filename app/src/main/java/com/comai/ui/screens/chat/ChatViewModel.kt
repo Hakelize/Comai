@@ -22,7 +22,8 @@ class ChatViewModel(
     private val ttsManager: TTSManager,
     private val contextBridge: com.comai.context.ContextBridge? = null,
     private val memoryRepository: com.comai.memory.MemoryRepository? = null,
-    private val textNormalizer: TextNormalizer = TextNormalizer()
+    private val textNormalizer: TextNormalizer = TextNormalizer(),
+    private val memoryContextProvider: com.comai.memory.MemoryContextProvider? = null
 ) : ViewModel() {
 
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
@@ -33,6 +34,17 @@ class ChatViewModel(
 
     /** Current language for text normalization. Updated from VoiceHomeScreen. */
     private var currentLanguage: ComaiLanguage = ComaiLanguage.ENGLISH
+
+    /** Tracks whether the user is actively viewing the Chat tab. AI responses in Chat are text-only (NO TTS). */
+    private var isChatTabActive: Boolean = false
+
+    fun setChatTabActive(active: Boolean) {
+        isChatTabActive = active
+        if (active) {
+            ttsManager.stop()
+        }
+        android.util.Log.i("ChatViewModel", "CHAT_TAB_ACTIVE: $active (TTS disabled in chat)")
+    }
 
     fun setLanguage(language: ComaiLanguage) {
         currentLanguage = language
@@ -70,7 +82,9 @@ class ChatViewModel(
                         action = response.action
                     )
                     _messages.value = _messages.value + proactiveMessage
-                    ttsManager.speak(response.speech)
+                    if (!isChatTabActive) {
+                        ttsManager.speak(response.speech)
+                    }
                 }
             }
         }
@@ -83,12 +97,22 @@ class ChatViewModel(
         )
     }
 
-    fun sendMessage(text: String) {
-        if (text.isBlank()) return
+    fun sendMessage(
+        text: String,
+        mediaUri: String? = null,
+        mediaType: String? = null,
+        mediaName: String? = null,
+        speakResponse: Boolean? = null
+    ) {
+        if (text.isBlank() && mediaUri == null) return
 
+        val effectiveContent = if (text.isNotBlank()) text else (mediaName ?: "Sent an attachment")
         val userMessage = ChatMessage(
-            content = text,
-            isFromUser = true
+            content = effectiveContent,
+            isFromUser = true,
+            mediaUri = mediaUri,
+            mediaType = mediaType,
+            mediaName = mediaName
         )
         _messages.value = _messages.value + userMessage
 
@@ -99,17 +123,23 @@ class ChatViewModel(
                 memoryRepository?.extractAndStoreMemory(text)
 
                 // Retrieve relevant memories for this task / context
-                val retrievedData = memoryRepository?.retrieveRelevantMemories(
+                val provider = memoryContextProvider ?: memoryRepository?.let { com.comai.memory.MemoryContextProvider(it) }
+                val retrievedData = provider?.getFormattedMemoryContext(
+                    task = text,
+                    signals = _currentContext.value.contextSignals
+                )
+                val memoryContextList = provider?.getMemoryContextList(
                     task = text,
                     signals = _currentContext.value.contextSignals
                 )
 
                 val input = _currentContext.value.copy(
                     task = textNormalizer.normalize(text, currentLanguage),
-                    retrievedData = retrievedData
+                    retrievedData = retrievedData,
+                    memoryContext = memoryContextList
                 )
                 android.util.Log.i("ChatViewModel", "TEXT_SUBMITTED: length=${text.length}, lang=${currentLanguage.name}")
-                android.util.Log.i("ChatViewModel", "AI_PROCESSING: task=${input.task}, hasRetrievedData=${retrievedData != null}")
+                android.util.Log.i("ChatViewModel", "AI_PROCESSING: task=${input.task}, hasRetrievedData=${retrievedData != null}, memCount=${memoryContextList?.size ?: 0}")
                 val response = aiEngine.process(input)
                 android.util.Log.i("ChatViewModel", "AI_RESPONSE: action=${response.action}")
 
@@ -120,8 +150,13 @@ class ChatViewModel(
                 )
                 _messages.value = _messages.value + aiMessage
 
-                // Speak response via Android TTS
-                ttsManager.speak(response.speech)
+                // Speak response via Android TTS ONLY when outside Chat tab (or explicitly requested)
+                val shouldSpeak = if (isChatTabActive) false else (speakResponse ?: true)
+                if (shouldSpeak) {
+                    ttsManager.speak(response.speech)
+                } else {
+                    android.util.Log.i("ChatViewModel", "TTS_SUPPRESSED: Chat tab is active; text-only response delivered.")
+                }
             } catch (e: Exception) {
                 android.util.Log.e("ChatViewModel", "AI processing failure", e)
                 val errorBubble = ChatMessage(
@@ -156,7 +191,9 @@ class ChatViewModel(
                     action = response.action
                 )
                 _messages.value = _messages.value + aiMessage
-                ttsManager.speak(response.speech)
+                if (!isChatTabActive) {
+                    ttsManager.speak(response.speech)
+                }
             } catch (e: Exception) {
                 val errorBubble = ChatMessage(
                     content = "I'm having trouble triggering that scenario right now.",

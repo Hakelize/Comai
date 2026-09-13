@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -21,7 +20,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.util.Locale
 
 enum class VoiceState {
     IDLE,
@@ -36,19 +34,21 @@ enum class VoiceState {
  *
  * Responsibilities:
  * - Single-tap push-to-talk voice capture.
- * - Prioritizes on-device SpeechRecognizer (API 31+) with automatic fallback to standard SpeechRecognizer
- *   when on-device language models or permissions are unavailable on specific OEM hardware (Error 13).
+ * - Uses native Android SpeechRecognizer configured on Main Thread with Google Speech Services.
+ * - Supports Indian multilingual speech recognition (en-IN, ta-IN, te-IN, hi-IN, ml-IN).
  * - Prevents duplicate startListening() calls.
  * - Feeds final recognized text directly into ChatViewModel's message pipeline.
- * - Prevents audio feedback loops (stops TTS before listening; ignores mic while speaking).
+ * - Prevents audio feedback loops (ensures TTS is fully silent before opening the microphone).
  * - Comprehensive boundary diagnostic logging.
  */
 class VoiceInteractionManager(
     private val context: Context,
     private val ttsManager: TTSManager,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob()),
-    private val onSpeechRecognized: (String) -> Unit = {}
+    private var onSpeechRecognized: ((String) -> Unit)? = null
 ) {
+
+    private val appContext: Context = context.applicationContext
 
     private val _state = MutableStateFlow(VoiceState.IDLE)
     val state: StateFlow<VoiceState> = _state.asStateFlow()
@@ -62,29 +62,44 @@ class VoiceInteractionManager(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    private val _language = MutableStateFlow(ComaiLanguage.ENGLISH)
-    val language: StateFlow<ComaiLanguage> = _language.asStateFlow()
+    private val _uiLanguage = MutableStateFlow(ComaiLanguage.ENGLISH)
+    val uiLanguage: StateFlow<ComaiLanguage> = _uiLanguage.asStateFlow()
+
+    /** Retained for backward compatibility with callers referencing language */
+    val language: StateFlow<ComaiLanguage> get() = _uiLanguage.asStateFlow()
 
     private var speechRecognizer: SpeechRecognizer? = null
-    private var isUsingOnDeviceRecognizer: Boolean = false
-    private var forceStandardRecognizer: Boolean = false
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var activeSessionId = 0L
 
     var onPermissionRequired: (() -> Unit)? = null
 
-    /** Update the STT language. Takes effect on the next startListening() call. */
+    fun setOnSpeechRecognizedListener(listener: (String) -> Unit) {
+        this.onSpeechRecognized = listener
+    }
+
+    /** Update the UI/TTS language. Recognition remains multilingual. */
     fun setLanguage(lang: ComaiLanguage) {
-        _language.value = lang
+        _uiLanguage.value = lang
         _errorMessage.value = null
-        Log.i(TAG, "LANGUAGE_SET: ${lang.name} (stt=${lang.sttTag})")
+        Log.i(TAG, "UI_LANGUAGE_SET: ${lang.name} (default stt=${lang.sttTag})")
     }
 
     init {
+        // Immediate notification before speech synthesis starts
+        ttsManager.onBeforeSpeak = {
+            mainHandler.post {
+                _state.value = VoiceState.SPEAKING
+                destroyRecognizerInternal()
+            }
+        }
+
         scope.launch {
             ttsManager.isSpeaking.collect { isSpeaking ->
                 if (isSpeaking) {
-                    if (_state.value == VoiceState.PROCESSING || _state.value == VoiceState.LISTENING) {
+                    if (_state.value != VoiceState.SPEAKING) {
                         _state.value = VoiceState.SPEAKING
+                        destroyRecognizerInternal()
                     }
                 } else if (_state.value == VoiceState.SPEAKING) {
                     _state.value = VoiceState.IDLE
@@ -97,17 +112,68 @@ class VoiceInteractionManager(
      * Checks whether native speech recognition is available on this device.
      */
     fun isRecognitionAvailable(): Boolean {
-        return SpeechRecognizer.isRecognitionAvailable(context)
+        return SpeechRecognizer.isRecognitionAvailable(appContext)
     }
 
     /**
-     * Checks whether offline/on-device recognition is supported (API 31+).
+     * Speaks a short conversational greeting first, and once TTS completes, enters LISTENING state.
+     * Prevents any audio feedback loop by keeping the SpeechRecognizer stopped and blocked while speaking.
      */
-    fun isOnDeviceAvailable(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
-        } else {
-            false
+    fun speakGreetingAndListen(greeting: String) {
+        Log.i(TAG, "GREET_AND_LISTEN_REQUESTED: $greeting")
+
+        scope.launch(Dispatchers.Main) {
+            // Guard against starting while already speaking
+            if (_state.value == VoiceState.SPEAKING) {
+                Log.d(TAG, "Already speaking, ignoring duplicate speakGreetingAndListen")
+                return@launch
+            }
+
+            // Audio feedback prevention: Ensure mic is completely closed and inactive while TTS speaks
+            _state.value = VoiceState.SPEAKING
+            _errorMessage.value = null
+            destroyRecognizerInternal()
+
+            // Wait for TTS engine to finish asynchronous initialization if app just launched
+            val isReady = ttsManager.awaitReady(2500L)
+            if (!isReady) {
+                Log.w(TAG, "TTS not ready within timeout; resetting to IDLE and starting listening.")
+                _state.value = VoiceState.IDLE
+                startListeningInternal()
+                return@launch
+            }
+
+            // Confirm we are still in SPEAKING state (user hasn't cancelled or switched tabs)
+            if (_state.value != VoiceState.SPEAKING) {
+                Log.d(TAG, "State changed from SPEAKING during TTS init wait; aborting greeting speech.")
+                return@launch
+            }
+
+            val greetingSession = activeSessionId
+
+            val spoken = ttsManager.speak(greeting) {
+                // UtteranceProgressListener.onDone() callback from Android TTS engine
+                scope.launch(Dispatchers.Main) {
+                    if (_state.value == VoiceState.SPEAKING && greetingSession == activeSessionId) {
+                        Log.i(TAG, "Greeting TTS completed. Adding 350ms acoustic buffer before mic...")
+                        // 350ms acoustic buffer: Wait for physical DAC / audio track playback buffer to flush completely from phone speakers
+                        kotlinx.coroutines.delay(350L)
+                        if (_state.value == VoiceState.SPEAKING && greetingSession == activeSessionId) {
+                            Log.i(TAG, "Acoustic buffer elapsed. Transitioning strictly to LISTENING.")
+                            _state.value = VoiceState.IDLE
+                            startListeningInternal()
+                        }
+                    } else {
+                        Log.d(TAG, "Greeting completed but state changed or session cancelled; not opening mic.")
+                    }
+                }
+            }
+
+            if (!spoken) {
+                Log.w(TAG, "TTS speak returned false; cleanly resetting to IDLE and listening.")
+                _state.value = VoiceState.IDLE
+                startListeningInternal()
+            }
         }
     }
 
@@ -116,101 +182,118 @@ class VoiceInteractionManager(
      * Prevents duplicate recognizers or multiple starts.
      */
     fun startListening() {
-        startListeningInternal(isFallbackAttempt = false)
+        mainHandler.post {
+            startListeningInternal()
+        }
     }
 
-    private fun startListeningInternal(isFallbackAttempt: Boolean) {
-        Log.i(TAG, "MIC_REQUESTED (fallbackMode=$forceStandardRecognizer, isFallbackAttempt=$isFallbackAttempt)")
+    private fun startListeningInternal() {
+        Log.i(TAG, "MIC_REQUESTED")
 
-        // 1. Guard: Check current state to prevent duplicate start calls unless this is an immediate internal fallback
-        if (!isFallbackAttempt && (_state.value == VoiceState.LISTENING || _state.value == VoiceState.PROCESSING)) {
+        // 1. Guard: If Comai is currently speaking or TTS is active, NEVER open the microphone!
+        if (_state.value == VoiceState.SPEAKING || ttsManager.isSpeaking.value) {
+            Log.d(TAG, "startListening() rejected: Comai is currently speaking (state=${_state.value})")
+            return
+        }
+
+        // Guard: Check current state to prevent duplicate start calls
+        if (_state.value == VoiceState.LISTENING || _state.value == VoiceState.PROCESSING) {
             Log.d(TAG, "Duplicate startListening() ignored in state: ${_state.value}")
             return
         }
 
-        // Clear previous error
+        // Clear previous error and partial text
         _errorMessage.value = null
+        _partialText.value = ""
 
         // 2. Permission check
         val hasPermission = ContextCompat.checkSelfPermission(
-            context,
+            appContext,
             Manifest.permission.RECORD_AUDIO
         ) == PackageManager.PERMISSION_GRANTED
 
         if (!hasPermission) {
             Log.w(TAG, "MIC_PERMISSION_DENIED")
             _state.value = VoiceState.ERROR
-            _errorMessage.value = "Microphone permission denied. Please grant permission."
+            _errorMessage.value = "Microphone permission required. Tap to grant."
             onPermissionRequired?.invoke()
-            mainHandler.postDelayed({ _state.value = VoiceState.IDLE }, 2000)
+            mainHandler.postDelayed({
+                if (_state.value == VoiceState.ERROR) {
+                    _state.value = VoiceState.IDLE
+                }
+            }, 2500)
             return
         }
 
         Log.i(TAG, "MIC_PERMISSION_GRANTED")
 
-        // 3. Audio feedback prevention: Stop any ongoing TTS immediately
+        // 3. Audio feedback prevention: Stop any ongoing TTS immediately before opening mic
         ttsManager.stop()
 
-        // 4. Create SpeechRecognizer instance (prefer on-device if available and not explicitly forced to standard)
-        destroyRecognizer()
+        // 4. Destroy existing recognizer and increment session before building a new clean session
+        destroyRecognizerInternal()
+        val session = activeSessionId
 
-        val canTryOnDevice = !forceStandardRecognizer && isOnDeviceAvailable()
-        if (canTryOnDevice && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            Log.i(TAG, "SPEECH_RECOGNIZER_CREATED: On-Device SpeechRecognizer (API 31+)")
-            isUsingOnDeviceRecognizer = true
-            speechRecognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
-        } else {
-            Log.i(TAG, "SPEECH_RECOGNIZER_CREATED: Standard Android SpeechRecognizer")
-            isUsingOnDeviceRecognizer = false
-            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
-        }
-
-        if (speechRecognizer == null) {
-            Log.e(TAG, "SPEECH_ERROR: SpeechRecognizer instance creation returned null")
+        // 5. Create SpeechRecognizer instance on Main Thread
+        try {
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(appContext)
+            Log.i(TAG, "SPEECH_RECOGNIZER_CREATED: Standard Android SpeechRecognizer (session=$session)")
+        } catch (e: Exception) {
+            Log.e(TAG, "SPEECH_ERROR: SpeechRecognizer creation failed", e)
             _state.value = VoiceState.ERROR
-            _errorMessage.value = "Speech recognizer initialization failed. Tap orb to retry."
-            mainHandler.postDelayed({ _state.value = VoiceState.IDLE }, 2000)
+            _errorMessage.value = "Failed to create speech recognizer: ${e.message}"
+            mainHandler.postDelayed({ _state.value = VoiceState.IDLE }, 2500)
             return
         }
 
-        speechRecognizer?.setRecognitionListener(createRecognitionListener())
+        if (speechRecognizer == null) {
+            Log.e(TAG, "SPEECH_ERROR: SpeechRecognizer instance is null")
+            _state.value = VoiceState.ERROR
+            _errorMessage.value = "Speech recognition unavailable on device."
+            mainHandler.postDelayed({ _state.value = VoiceState.IDLE }, 2500)
+            return
+        }
 
-        val lang = _language.value
+        speechRecognizer?.setRecognitionListener(createRecognitionListener(session))
+
+        val uiLang = _uiLanguage.value
+        // Decouple UI language from spoken language:
+        // Pass all supported Indian languages (en-IN, ta-IN, hi-IN, te-IN, ml-IN) so SpeechRecognizer
+        // can decode native speech and code-switching (Tanglish, mixed phrases).
+        val allSupportedLocales = listOf("en-IN", "ta-IN", "hi-IN", "te-IN", "ml-IN")
+        val primaryTag = uiLang.sttTag
+
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang.sttTag)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, lang.sttTag)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, primaryTag)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, primaryTag)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-            putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
-            if (lang.altLocales.isNotEmpty()) {
-                putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", lang.altLocales.toTypedArray())
-            }
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+            putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, appContext.packageName)
+            // Multilingual recognition extras
+            putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", allSupportedLocales.toTypedArray())
+            putStringArrayListExtra(RecognizerIntent.EXTRA_SUPPORTED_LANGUAGES, ArrayList(allSupportedLocales))
+            putExtra("android.speech.extra.EXTRA_ENABLE_LANGUAGE_SWITCH", true)
+            putExtra("android.speech.extra.LANGUAGE_SWITCH_INITIAL_ACTIVE_DURATION_TIME_MILLIS", 5000L)
+            // Comfortable listening silence buffers
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 3000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
         }
-        Log.i(TAG, "STT_LOCALE: ${lang.sttTag} (alt=${lang.altLocales})")
+        Log.i(TAG, "MULTILINGUAL_STT_INTENT: primary=$primaryTag, additional=$allSupportedLocales")
 
+        _state.value = VoiceState.LISTENING
         Log.i(TAG, "MIC_STARTED")
         Log.i(TAG, "LISTENING_STARTED")
-        _state.value = VoiceState.LISTENING
-        _partialText.value = ""
 
-        mainHandler.post {
-            try {
-                speechRecognizer?.startListening(intent)
-            } catch (e: Exception) {
-                Log.e(TAG, "SPEECH_ERROR: startListening exception: ${e.message}")
-                if (isUsingOnDeviceRecognizer) {
-                    Log.w(TAG, "SPEECH_FALLBACK: startListening failed on-device. Retrying with standard SpeechRecognizer.")
-                    forceStandardRecognizer = true
-                    destroyRecognizer()
-                    startListeningInternal(isFallbackAttempt = true)
-                    return@post
-                }
-                _state.value = VoiceState.ERROR
-                _errorMessage.value = "Failed to start speech capture: ${e.message}"
-                destroyRecognizer()
-                mainHandler.postDelayed({ _state.value = VoiceState.IDLE }, 2000)
-            }
+        try {
+            speechRecognizer?.startListening(intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "SPEECH_ERROR: startListening exception", e)
+            _state.value = VoiceState.ERROR
+            _errorMessage.value = "Failed to start listening: ${e.message}"
+            destroyRecognizerInternal()
+            mainHandler.postDelayed({ _state.value = VoiceState.IDLE }, 2500)
         }
     }
 
@@ -218,25 +301,32 @@ class VoiceInteractionManager(
      * Stop listening manually if the user taps during listening.
      */
     fun stopListening() {
-        Log.i(TAG, "LISTENING_STOPPED")
-        try {
-            speechRecognizer?.stopListening()
-        } catch (e: Exception) {
-            Log.w(TAG, "stopListening exception: ${e.message}")
+        mainHandler.post {
+            Log.i(TAG, "LISTENING_STOPPED")
+            try {
+                speechRecognizer?.stopListening()
+            } catch (e: Exception) {
+                Log.w(TAG, "stopListening exception: ${e.message}")
+            }
         }
     }
 
     /**
-     * Cancel and release recognizer resources.
+     * Cancel and release recognizer and TTS resources.
      */
     fun cancel() {
-        destroyRecognizer()
-        _state.value = VoiceState.IDLE
-        _partialText.value = ""
-        _errorMessage.value = null
+        mainHandler.post {
+            destroyRecognizerInternal()
+            ttsManager.stop()
+            _state.value = VoiceState.IDLE
+            _partialText.value = ""
+            _errorMessage.value = null
+            _rmsDb.value = 0f
+        }
     }
 
-    private fun destroyRecognizer() {
+    private fun destroyRecognizerInternal() {
+        activeSessionId++
         try {
             speechRecognizer?.cancel()
             speechRecognizer?.destroy()
@@ -247,95 +337,110 @@ class VoiceInteractionManager(
         }
     }
 
-    private fun createRecognitionListener() = object : RecognitionListener {
+    private fun createRecognitionListener(listenerSession: Long) = object : RecognitionListener {
+        private fun isSessionInvalid(): Boolean {
+            return listenerSession != activeSessionId || _state.value == VoiceState.SPEAKING || ttsManager.isSpeaking.value
+        }
+
         override fun onReadyForSpeech(params: Bundle?) {
-            Log.i(TAG, "AUDIO_CAPTURE_STARTED (OnDevice=$isUsingOnDeviceRecognizer)")
+            if (isSessionInvalid()) return
+            Log.i(TAG, "AUDIO_CAPTURE_STARTED")
         }
 
         override fun onBeginningOfSpeech() {
+            if (isSessionInvalid()) return
             Log.d(TAG, "User started speaking")
         }
 
         override fun onRmsChanged(rmsdB: Float) {
+            if (isSessionInvalid()) return
             _rmsDb.value = rmsdB
         }
 
         override fun onBufferReceived(buffer: ByteArray?) {}
 
         override fun onEndOfSpeech() {
+            if (isSessionInvalid()) return
             Log.d(TAG, "User finished speaking")
         }
 
         override fun onError(error: Int) {
-            val currentLang = _language.value
-            val (errorMsg, isFatal) = when (error) {
-                SpeechRecognizer.ERROR_AUDIO -> "Audio recording error (Code 3)" to true
-                SpeechRecognizer.ERROR_CLIENT -> "Client error (Code 5)" to true
-                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission required (Code 9)" to true
-                SpeechRecognizer.ERROR_NETWORK -> "Network error (Code 2)" to true
-                SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout (Code 1)" to true
-                SpeechRecognizer.ERROR_NO_MATCH -> "No speech match (Code 7)" to false
-                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer busy (Code 8)" to true
-                SpeechRecognizer.ERROR_SERVER -> "Server error (Code 4)" to true
-                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Speech timeout / silence (Code 6)" to false
-                10 -> "Too many requests (Code 10)" to true
-                11 -> "Server disconnected (Code 11)" to true
-                12 -> "Language not supported on device: ${currentLang.displayName} (Code 12)" to true
-                13 -> "Language unavailable: ${currentLang.displayName} (Code 13)" to true
-                14 -> "Cannot check language support (Code 14)" to true
-                else -> "Speech error: Code $error" to true
-            }
-            Log.w(TAG, "SPEECH_ERROR: $errorMsg ($error), onDevice=$isUsingOnDeviceRecognizer")
-
-            // Check if fallback to standard recognizer should be triggered for OEM on-device errors (e.g. Error 13)
-            if (isUsingOnDeviceRecognizer && (error == 13 || error == 12 || error == SpeechRecognizer.ERROR_CLIENT || error == SpeechRecognizer.ERROR_SERVER)) {
-                Log.w(TAG, "SPEECH_FALLBACK: On-device recognizer failed with error $error ($errorMsg). Retrying immediately with standard SpeechRecognizer.")
-                forceStandardRecognizer = true
-                destroyRecognizer()
-                startListeningInternal(isFallbackAttempt = true)
+            if (isSessionInvalid()) {
+                Log.d(TAG, "Dropping STT onError($error): session invalid or Comai is speaking")
                 return
             }
-
-            if (!isFatal) {
-                Log.i(TAG, "NO_MATCH: No speech detected or timeout")
-                _state.value = VoiceState.IDLE
-                _errorMessage.value = null
-            } else {
-                _state.value = VoiceState.ERROR
-                _errorMessage.value = "$errorMsg. Tap orb to retry."
-                mainHandler.postDelayed({
-                    if (_state.value == VoiceState.ERROR) {
-                        _state.value = VoiceState.IDLE
-                    }
-                }, 3000)
+            val currentUiLang = _uiLanguage.value
+            val (errorMsg, isFatal) = when (error) {
+                SpeechRecognizer.ERROR_AUDIO -> "Audio recording error" to true
+                SpeechRecognizer.ERROR_CLIENT -> "Speech recognition client error" to true
+                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission required" to true
+                SpeechRecognizer.ERROR_NETWORK -> "Network connection error" to true
+                SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network connection timeout" to true
+                SpeechRecognizer.ERROR_NO_MATCH -> "No speech match" to false
+                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Speech recognizer busy" to true
+                SpeechRecognizer.ERROR_SERVER -> "Speech server error" to true
+                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Speech timeout" to false
+                10 -> "Too many speech requests" to true
+                11 -> "Speech server disconnected" to true
+                12 -> "Language not supported by speech provider" to true
+                13 -> "Language service unavailable" to true
+                14 -> "Language check failed" to true
+                else -> "Speech recognition error ($error)" to true
             }
+            Log.w(TAG, "SPEECH_ERROR: $errorMsg (code=$error, uiLang=${currentUiLang.name})")
 
-            destroyRecognizer()
+            mainHandler.post {
+                if (isSessionInvalid()) return@post
+                destroyRecognizerInternal()
+
+                if (!isFatal) {
+                    Log.i(TAG, "NO_MATCH: No speech detected or timeout")
+                    _state.value = VoiceState.IDLE
+                    _errorMessage.value = null
+                } else {
+                    _state.value = VoiceState.ERROR
+                    _errorMessage.value = "$errorMsg. Tap orb to retry."
+                    mainHandler.postDelayed({
+                        if (_state.value == VoiceState.ERROR) {
+                            _state.value = VoiceState.IDLE
+                            _errorMessage.value = null
+                        }
+                    }, 3000)
+                }
+            }
         }
 
         override fun onResults(results: Bundle?) {
+            if (isSessionInvalid()) {
+                Log.d(TAG, "Dropping STT onResults: session invalid or Comai is speaking")
+                return
+            }
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-            val recognizedText = matches?.firstOrNull()?.trim()
+            val recognizedText = matches?.firstOrNull { it.isNotBlank() }?.trim()
 
-            destroyRecognizer()
+            mainHandler.post {
+                if (isSessionInvalid()) return@post
+                destroyRecognizerInternal()
 
-            if (!recognizedText.isNullOrBlank()) {
-                Log.i(TAG, "FINAL_RESULT: length=${recognizedText.length}")
-                _state.value = VoiceState.PROCESSING
-                _errorMessage.value = null
-                Log.i(TAG, "TEXT_SUBMITTED")
-                onSpeechRecognized(recognizedText)
-            } else {
-                Log.w(TAG, "NO_MATCH: Empty recognition results")
-                _state.value = VoiceState.IDLE
+                if (!recognizedText.isNullOrBlank()) {
+                    Log.i(TAG, "FINAL_RESULT: text=\"$recognizedText\" length=${recognizedText.length}")
+                    _state.value = VoiceState.PROCESSING
+                    _errorMessage.value = null
+                    Log.i(TAG, "TEXT_SUBMITTED")
+                    onSpeechRecognized?.invoke(recognizedText)
+                } else {
+                    Log.w(TAG, "NO_MATCH: Empty recognition results")
+                    _state.value = VoiceState.IDLE
+                }
             }
         }
 
         override fun onPartialResults(partialResults: Bundle?) {
+            if (isSessionInvalid()) return
             val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-            val partial = matches?.firstOrNull()?.trim() ?: ""
+            val partial = matches?.firstOrNull { it.isNotBlank() }?.trim() ?: ""
             if (partial.isNotBlank()) {
-                Log.d(TAG, "PARTIAL_RESULT: length=${partial.length}")
+                Log.d(TAG, "PARTIAL_RESULT: text=\"$partial\" length=${partial.length}")
                 _partialText.value = partial
             }
         }

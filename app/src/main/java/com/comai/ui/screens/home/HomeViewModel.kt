@@ -33,6 +33,9 @@ class HomeViewModel(
     private val preferences: OnboardingPreferences
 ) : ViewModel() {
 
+    var hasInitialGreetingPlayed: Boolean = false
+    var voiceManager: com.comai.voice.VoiceInteractionManager? = null
+
     private val _uiState = MutableStateFlow(buildHomeState(preferences.getProfile()))
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
@@ -47,7 +50,7 @@ class HomeViewModel(
             val minute = calendar.get(Calendar.MINUTE)
             val currentMinutes = hour * 60 + minute
 
-            val greeting = HomeGreetingUtils.computeGreeting(profile.name, calendar)
+            val greeting = HomeGreetingUtils.computeGreeting(profile.name, profile.preferredLanguage, calendar)
 
             val wakeMinutes = parseTimeToMinutes(profile.wakeTime, default = 7 * 60)
             val leaveMinutes = parseTimeToMinutes(profile.leaveHomeTime, default = 8 * 60 + 30)
