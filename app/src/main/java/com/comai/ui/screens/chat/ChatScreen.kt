@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -162,8 +163,11 @@ fun ChatScreen(
         }
     }
 
-    // Auto-scroll on new message
-    LaunchedEffect(messages.size, isTyping) {
+    val density = LocalDensity.current
+    val isKeyboardOpen = WindowInsets.ime.getBottom(density) > 0
+
+    // Auto-scroll on new message, typing indicator, or keyboard opening
+    LaunchedEffect(messages.size, isTyping, isKeyboardOpen) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
         }
@@ -404,8 +408,6 @@ fun ChatScreen(
 
                 // ── Unified Tab Switching Navigation Bar ────────────────
                 // Shows the identical navigation panel as Home/Profile when software keyboard is closed
-                val density = androidx.compose.ui.platform.LocalDensity.current
-                val isKeyboardOpen = WindowInsets.ime.getBottom(density) > 0
                 if (!isKeyboardOpen) {
                     ComaiBottomBar(
                         currentRoute = Routes.CHAT,
