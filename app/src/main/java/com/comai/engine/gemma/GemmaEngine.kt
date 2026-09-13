@@ -92,7 +92,25 @@ class GemmaEngine(
                 }
 
                 if (modelFile == null) {
-                    val err = "Gemma 4 model file not found in any candidate path: $candidatePaths"
+                    // Check if model is bundled inside APK assets
+                    val internalDest = File(context.filesDir, "models/$MODEL_FILENAME")
+                    if (isAssetPresent("models/$MODEL_FILENAME")) {
+                        Log.i(TAG, "Model found in APK assets! Extracting to ${internalDest.absolutePath}...")
+                        internalDest.parentFile?.mkdirs()
+                        context.assets.open("models/$MODEL_FILENAME").use { input ->
+                            internalDest.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        if (internalDest.exists() && internalDest.length() > 0) {
+                            modelFile = internalDest
+                            Log.i(TAG, "Successfully extracted model from APK assets: ${internalDest.length()} bytes")
+                        }
+                    }
+                }
+
+                if (modelFile == null) {
+                    val err = "Gemma 4 model file ($MODEL_FILENAME) not found in candidate paths ($candidatePaths) or APK assets."
                     Log.w(TAG, err)
                     initializationError = err
                     isInitializing = false
@@ -244,17 +262,28 @@ class GemmaEngine(
         }
     }
 
+    private fun isAssetPresent(modelName: String = MODEL_FILENAME): Boolean {
+        return try {
+            val list = context.assets.list("models") ?: emptyArray()
+            list.contains(modelName)
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     override fun isReady(): Boolean = inference != null
 
     override fun engineName(): String {
         return if (inference != null) {
             "Gemma 4 E4B ($activeBackend)"
         } else if (isInitializing) {
-            "Gemma 4 E4B (Loading...)"
+            "Gemma 4 E4B (Initializing...)"
         } else {
-            "Gemma 4 E4B (Fallback)"
+            "Mock Fallback (Model Missing)"
         }
     }
+
+    fun getEngineStatus(): String = engineName()
 
     fun close() {
         try {

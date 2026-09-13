@@ -21,7 +21,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.comai.R
 import com.comai.data.models.PersonalPlan
 import com.comai.data.models.ReminderType
@@ -46,52 +48,43 @@ fun PlanDialog(
 ) {
     val context = LocalContext.current
     var title by remember { mutableStateOf(initialPlan?.title ?: "") }
-    var time by remember { mutableStateOf(initialPlan?.time ?: "10:00 AM") }
-    var repeatFrequency by remember { mutableStateOf(initialPlan?.repeatFrequency ?: "Daily") }
+    var time by remember { mutableStateOf(initialPlan?.time ?: "09:00 AM") }
+    var repeatFrequency by remember { mutableStateOf(initialPlan?.repeatFrequency ?: "Once") }
     var reminderType by remember { mutableStateOf(initialPlan?.reminderType ?: ReminderType.NOTIFICATION) }
     var date by remember { mutableStateOf(initialPlan?.date ?: initialDate) }
     var titleError by remember { mutableStateOf<String?>(null) }
-
-    val canExactAlarm = remember { AlarmPermissionUtils.canScheduleExactAlarms(context) }
+    var canExactAlarm by remember { mutableStateOf(AlarmPermissionUtils.canScheduleExactAlarms(context)) }
 
     val quickTitles = listOf("Drink water", "Call Mom", "Go to gym", "Take a break", "Study", "Medication")
-    val repeatOptions = listOf("Daily", "Weekdays", "Weekends", "Mon, Wed, Fri", "Once")
+    val repeatOptions = listOf("Once", "Daily", "Mon-Fri", "Weekends", "Weekly", "Yearly")
 
-    // DatePicker dialog setup
-    val initialCal = remember(date) {
-        Calendar.getInstance().apply {
-            if (!date.isNullOrBlank()) {
-                try {
-                    val parts = date!!.split("-")
-                    if (parts.size == 3) {
-                        set(parts[0].toInt(), parts[1].toInt() - 1, parts[2].toInt())
-                    }
-                } catch (_: Exception) {}
+    val calendar = Calendar.getInstance()
+    val datePickerDialog = DatePickerDialog(
+        context,
+        { _, year, month, dayOfMonth ->
+            val picked = Calendar.getInstance().apply {
+                set(Calendar.YEAR, year)
+                set(Calendar.MONTH, month)
+                set(Calendar.DAY_OF_MONTH, dayOfMonth)
             }
-        }
-    }
+            date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(picked.time)
+        },
+        calendar.get(Calendar.YEAR),
+        calendar.get(Calendar.MONTH),
+        calendar.get(Calendar.DAY_OF_MONTH)
+    )
 
-    val datePickerDialog = remember {
-        DatePickerDialog(
-            context,
-            { _, year, month, dayOfMonth ->
-                date = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, dayOfMonth)
-            },
-            initialCal.get(Calendar.YEAR),
-            initialCal.get(Calendar.MONTH),
-            initialCal.get(Calendar.DAY_OF_MONTH)
-        )
-    }
-
-    val formattedDateDisplay = remember(date) {
-        if (!date.isNullOrBlank()) {
+    val formattedDateDisplay = remember(date, repeatFrequency) {
+        if (repeatFrequency == "Once" || repeatFrequency == "Weekly" || repeatFrequency == "Yearly") {
             try {
-                val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-                val d = sdf.parse(date!!)
-                if (d != null) {
-                    SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(d)
-                } else date ?: "Select Date"
-            } catch (_: Exception) {
+                if (date != null) {
+                    val parsed = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(date!!)
+                    if (parsed != null) SimpleDateFormat("EEE, MMM d, yyyy", Locale.getDefault()).format(parsed)
+                    else date ?: "Select Date"
+                } else {
+                    "Today"
+                }
+            } catch (e: Exception) {
                 date ?: "Select Date"
             }
         } else {
@@ -99,19 +92,36 @@ fun PlanDialog(
         }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            color = Color(0xFF131722),
-            shape = RoundedCornerShape(20.dp),
-            border = BorderStroke(1.dp, Color(0xFF222B3D)),
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .wrapContentHeight()
+                .fillMaxSize()
+                .imePadding()
+                .systemBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                horizontalAlignment = Alignment.Start
+            Surface(
+                color = Color(0xFF131722),
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.dp, Color(0xFF222B3D)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight()
             ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.Start
+                ) {
                 Text(
                     text = if (initialPlan == null) stringResource(R.string.schedule_add_plan_title) else stringResource(R.string.schedule_edit_plan_title),
                     color = TextPrimary,
@@ -435,6 +445,7 @@ fun PlanDialog(
             }
         }
     }
+}
 }
 
 /**

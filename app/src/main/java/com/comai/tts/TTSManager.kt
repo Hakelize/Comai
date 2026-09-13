@@ -107,13 +107,28 @@ open class TTSManager(context: Context? = null) {
     }
 
     /** Speak the given text. Stops any currently playing utterance first. */
+    /**
+     * Strips emojis, miscellaneous symbols, emoticons, pictographs, and surrogate pairs
+     * so the native TTS engine speaks naturally without stuttering, crashing, or reading
+     * awkward character descriptions like "grinning face with smiling eyes".
+     */
+    private fun sanitizeForTts(input: String): String {
+        return input
+            .replace(Regex("[\\p{So}\\p{Cn}\\p{Cs}]"), "")
+            .replace(Regex("[\\uD83C-\\uDBFF\\uDC00-\\uDFFF]"), "")
+            .replace(Regex("[\\u2600-\\u27BF]"), "")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
     open fun speak(text: String): Boolean {
         return speak(text, onDone = null)
     }
 
     open fun speak(text: String, onDone: (() -> Unit)?): Boolean {
-        if (!enabled || !isInitialized || text.isBlank()) {
-            android.util.Log.d("TTSManager", "TTS skipped: enabled=$enabled, initialized=$isInitialized")
+        val sanitized = sanitizeForTts(text)
+        if (!enabled || !isInitialized || sanitized.isBlank()) {
+            android.util.Log.d("TTSManager", "TTS skipped: enabled=$enabled, initialized=$isInitialized, textLength=${text.length}, sanitizedLength=${sanitized.length}")
             onDone?.invoke()
             return false
         }
@@ -123,13 +138,13 @@ open class TTSManager(context: Context? = null) {
             android.util.Log.w("TTSManager", "onBeforeSpeak exception: ${e.message}")
         }
         return try {
-            android.util.Log.i("TTSManager", "TTS started: length=${text.length}")
+            android.util.Log.i("TTSManager", "TTS started: length=${sanitized.length}")
             val utteranceId = UUID.randomUUID().toString()
             if (onDone != null) {
                 utteranceCallbacks[utteranceId] = onDone
             }
             val result = tts?.speak(
-                text,
+                sanitized,
                 TextToSpeech.QUEUE_FLUSH,
                 null,
                 utteranceId
