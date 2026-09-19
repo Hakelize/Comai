@@ -55,6 +55,26 @@ class NearbyContextProvider(
      * Takes the active schedules to correlate Location + Schedule Context.
      */
     suspend fun refreshContext(activePlans: List<PersonalPlan> = emptyList()): NearbyContext = withContext(Dispatchers.IO) {
+        // Guard: if location permission not granted, return a clear permission-missing state
+        if (!locationHelper.hasLocationPermission()) {
+            val noPermContext = NearbyContext(
+                location = LocationState(
+                    isPermissionGranted = false,
+                    isLocationServicesEnabled = locationHelper.isLocationServicesEnabled(),
+                    hasFix = false
+                ),
+                traffic = NearbyTraffic(level = TrafficLevel.NORMAL, summary = ""),
+                news = emptyList(),
+                events = emptyList(),
+                contextualInsight = null,
+                isOffline = false,
+                timestamp = System.currentTimeMillis(),
+                source = "Permission Required"
+            )
+            _nearbyContext.value = noPermContext
+            return@withContext noPermContext
+        }
+
         val isOnline = isInternetAvailable()
         val locState = locationHelper.getCurrentLocationState()
 

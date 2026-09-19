@@ -65,6 +65,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Comai"
+        android:usesCleartextTraffic="true"
         tools:targetApi="34">
 
         <!-- Main UI -->

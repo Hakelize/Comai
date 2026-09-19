@@ -10,6 +10,12 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
@@ -457,60 +463,147 @@ fun ChatBubble(msg: ChatMessage) {
     val timeFormatted = remember(msg.timestamp) {
         SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(msg.timestamp))
     }
+    val context = LocalContext.current
 
     Box(
         modifier = Modifier.fillMaxWidth(),
         contentAlignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
     ) {
         Column(
-            modifier = Modifier
-                .widthIn(max = 310.dp)
-                .clip(
-                    RoundedCornerShape(
-                        topStart = 18.dp,
-                        topEnd = 18.dp,
-                        bottomStart = if (isUser) 18.dp else 4.dp,
-                        bottomEnd = if (isUser) 4.dp else 18.dp
-                    )
-                )
-                .background(if (isUser) UserBubbleColor else AIBubbleColor)
-                .padding(horizontal = 14.dp, vertical = 10.dp)
+            modifier = Modifier.widthIn(max = 310.dp)
         ) {
-            // Attached Media (Image or Document)
-            if (msg.mediaUri != null) {
-                MediaAttachmentBubble(
-                    uriString = msg.mediaUri,
-                    mediaType = msg.mediaType,
-                    mediaName = msg.mediaName
+            // Main message bubble
+            Column(
+                modifier = Modifier
+                    .clip(
+                        RoundedCornerShape(
+                            topStart = 18.dp,
+                            topEnd = 18.dp,
+                            bottomStart = if (isUser) 18.dp else 4.dp,
+                            bottomEnd = if (isUser) 4.dp else 18.dp
+                        )
+                    )
+                    .background(if (isUser) UserBubbleColor else AIBubbleColor)
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                // Attached Media (Image or Document)
+                if (msg.mediaUri != null) {
+                    MediaAttachmentBubble(
+                        uriString = msg.mediaUri,
+                        mediaType = msg.mediaType,
+                        mediaName = msg.mediaName
+                    )
+                }
+
+                Text(
+                    text = msg.content,
+                    color = TextOnBubble,
+                    fontSize = 15.sp,
+                    lineHeight = 21.sp
                 )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(
+                    modifier = Modifier.align(Alignment.End),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = timeFormatted,
+                        color = if (isUser) Color.White.copy(alpha = 0.75f) else TextTimestamp,
+                        fontSize = 11.sp
+                    )
+                    if (isUser) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "✓✓",
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
 
-            Text(
-                text = msg.content,
-                color = TextOnBubble,
-                fontSize = 15.sp,
-                lineHeight = 21.sp
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Row(
-                modifier = Modifier.align(Alignment.End),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = timeFormatted,
-                    color = if (isUser) Color.White.copy(alpha = 0.75f) else TextTimestamp,
-                    fontSize = 11.sp
-                )
-                if (isUser) {
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "✓✓",
-                        color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+            // ── Web Search Citations ──
+            if (!isUser && !msg.citations.isNullOrEmpty()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    // "Sources" label
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Outlined.TravelExplore,
+                            contentDescription = null,
+                            tint = ElectricTeal,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Sources",
+                            color = ElectricTeal,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    msg.citations.forEach { citation ->
+                        Surface(
+                            color = Color(0xFF131722),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, Color(0xFF1E283A)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    try {
+                                        val intent = android.content.Intent(
+                                            android.content.Intent.ACTION_VIEW,
+                                            android.net.Uri.parse(citation.url)
+                                        )
+                                        context.startActivity(intent)
+                                    } catch (_: Exception) { }
+                                }
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = citation.title,
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Surface(
+                                        color = Color(0xFF1A2436),
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
+                                        Text(
+                                            text = citation.source,
+                                            color = ElectricTeal,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(3.dp))
+                                Text(
+                                    text = citation.snippet,
+                                    color = TextSecondary,
+                                    fontSize = 11.sp,
+                                    lineHeight = 15.sp,
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -582,34 +675,46 @@ private fun loadLocalBitmap(context: Context, uriString: String): androidx.compo
 
 @Composable
 fun TypingIndicatorBubble() {
+    val infiniteTransition = rememberInfiniteTransition(label = "typing")
+
+    // Three dots with staggered 150ms delay each
+    @Composable
+    fun animatedDot(delayMs: Int): Float {
+        val offsetY by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = -5f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(400, delayMillis = delayMs, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "dot_$delayMs"
+        )
+        return offsetY
+    }
+
+    val dot1 = animatedDot(0)
+    val dot2 = animatedDot(150)
+    val dot3 = animatedDot(300)
+
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(16.dp))
             .background(AIBubbleColor)
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(6.dp)
-                    .clip(CircleShape)
-                    .background(ElectricTeal)
-            )
-            Box(
-                modifier = Modifier
-                    .size(6.dp)
-                    .clip(CircleShape)
-                    .background(ElectricTeal.copy(alpha = 0.6f))
-            )
-            Box(
-                modifier = Modifier
-                    .size(6.dp)
-                    .clip(CircleShape)
-                    .background(ElectricTeal.copy(alpha = 0.3f))
-            )
+            listOf(dot1, dot2, dot3).forEach { offsetY ->
+                Box(
+                    modifier = Modifier
+                        .offset(y = offsetY.dp)
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(ElectricTeal)
+                )
+            }
         }
     }
 }

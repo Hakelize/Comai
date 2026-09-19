@@ -53,7 +53,8 @@ data class OnboardingUiState(
 
 class OnboardingViewModel(
     private val preferences: OnboardingPreferences,
-    private val userProfileDao: UserProfileDao? = null
+    private val userProfileDao: UserProfileDao? = null,
+    private val memoryRepository: com.comai.memory.MemoryRepository? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -397,6 +398,11 @@ class OnboardingViewModel(
         preferences.saveProfile(profile)
         preferences.setOnboardingCompleted(true)
         _uiState.value = _uiState.value.copy(isCompleted = true, generalError = null)
+
+        // Immediately sync profile to memories so LLM can answer personal questions right away
+        if (memoryRepository != null) {
+            com.comai.memory.OnboardingMemorySyncer.syncProfile(profile, memoryRepository, viewModelScope)
+        }
 
         // Sync to Room UserProfile if DAO is provided
         if (userProfileDao != null) {

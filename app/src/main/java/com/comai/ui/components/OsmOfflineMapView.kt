@@ -1,43 +1,46 @@
 package com.comai.ui.components
 
 import android.content.Context
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.comai.ui.theme.ElectricTeal
+import com.comai.ui.theme.TextSecondary
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
+import java.util.Locale
 
 /**
- * Compose wrapper for osmdroid MapView.
+ * Crash-resilient Compose wrapper for osmdroid MapView.
  *
  * Library: osmdroid 6.1.20 (Apache 2.0)
- * Map data: (c) OpenStreetMap contributors (ODbL) - https://www.openstreetmap.org/copyright
+ * Map data: (c) OpenStreetMap contributors (ODbL)
  *
- * Offline behavior:
- *   - Tiles downloaded when internet is available are cached in app-specific storage.
- *   - When offline, previously cached tiles render normally.
- *   - When no tiles are cached for the current area, gray tile placeholders appear.
- *
- * Lifecycle:
- *   - MapView.onResume() / onPause() follow the host Composable's lifecycle.
- *   - DisposableEffect ensures MapView.onDetach() is called when the Composable leaves
- *     composition, preventing memory leaks and duplicate map instances.
- *
- * @param latitude   Current latitude (null = no fix yet, shows world view)
- * @param longitude  Current longitude
- * @param modifier   Compose Modifier for sizing
- * @param zoom       Zoom level when a fix is present (15 = neighbourhood detail)
+ * Resilient Architecture:
+ * - Uses applicationContext to avoid ContextWrapper / Theme issues.
+ * - Handles factory, update, and onRelease safely within AndroidView.
+ * - Never re-uses a detached MapView (prevents NullPointerException in TileProvider).
+ * - Comprehensive fallback UI if native mapping fails on specific hardware.
  */
 @Composable
 fun OsmOfflineMapView(
@@ -47,85 +50,150 @@ fun OsmOfflineMapView(
     zoom: Double = 15.0
 ) {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
+    val appContext = remember(context) { context.applicationContext }
+    var hasMapFailed by remember { mutableStateOf(false) }
 
-    // Single MapView instance - NOT recreated on recomposition
-    val mapView = remember { createOsmMapView(context) }
-
-    // Follow host lifecycle: pause/resume tile fetching and GPS overlay
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> mapView.onResume()
-                Lifecycle.Event.ON_PAUSE  -> mapView.onPause()
-                else -> Unit
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-            mapView.overlays.clear()
-            mapView.onDetach()
-        }
-    }
-
-    // Re-center and update marker whenever the location fix changes
-    LaunchedEffect(latitude, longitude) {
-        if (latitude != null && longitude != null) {
-            val geoPoint = GeoPoint(latitude, longitude)
-            mapView.controller.setZoom(zoom)
-            mapView.controller.animateTo(geoPoint)
-
-            // Replace any existing "You" marker
-            mapView.overlays.removeAll { it is Marker }
-            val marker = Marker(mapView).apply {
-                position = geoPoint
-                title = "You"
-                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-            }
-            mapView.overlays.add(marker)
-            mapView.invalidate()
-        }
+    if (hasMapFailed) {
+        MapFallbackPlaceholder(latitude = latitude, longitude = longitude, modifier = modifier)
+        return
     }
 
     AndroidView(
-        factory = { mapView },
+        factory = {
+            try {
+                createOsmMapView(appContext)
+            } catch (t: Throwable) {
+                android.util.Log.e("OsmOfflineMapView", "Failed to construct osmdroid MapView", t)
+                hasMapFailed = true
+                android.view.View(appContext)
+            }
+        },
         modifier = modifier,
-        update = { /* location updates driven by LaunchedEffect */ }
+        update = { view ->
+            if (view is MapView) {
+                try {
+                    val validLat = latitude?.takeIf { !it.isNaN() && !it.isInfinite() } ?: 13.0827
+                    val validLng = longitude?.takeIf { !it.isNaN() && !it.isInfinite() } ?: 80.2707
+                    val geoPoint = GeoPoint(validLat, validLng)
+
+                    view.controller.setZoom(zoom)
+                    view.controller.setCenter(geoPoint)
+
+                    if (latitude != null && longitude != null && !latitude.isNaN() && !longitude.isNaN()) {
+                        view.overlays.removeAll { it is Marker }
+                        val marker = Marker(view).apply {
+                            position = geoPoint
+                            title = "You Are Here"
+                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                        }
+                        view.overlays.add(marker)
+                    }
+                    view.invalidate()
+                } catch (t: Throwable) {
+                    android.util.Log.w("OsmOfflineMapView", "Error updating MapView: ${t.message}")
+                }
+            }
+        },
+        onRelease = { view ->
+            try {
+                if (view is MapView) {
+                    view.overlays.clear()
+                    view.onDetach()
+                }
+            } catch (t: Throwable) {
+                android.util.Log.w("OsmOfflineMapView", "Error releasing MapView: ${t.message}")
+            }
+        }
     )
 }
 
 /**
- * Builds and configures a fresh osmdroid MapView.
- * Called exactly once via [remember].
+ * Builds and configures an osmdroid MapView instance safely using applicationContext.
  */
-private fun createOsmMapView(context: Context): MapView {
-    // Safety net: ensure configuration exists even if Application.onCreate order varies
-    Configuration.getInstance().apply {
-        if (userAgentValue.isBlank()) userAgentValue = context.packageName
-        if (osmdroidTileCache == null) {
-            osmdroidTileCache = java.io.File(context.getExternalFilesDir(null), "osmdroid/tiles")
+private fun createOsmMapView(appContext: Context): MapView {
+    try {
+        val osmBase = java.io.File(appContext.filesDir, "osmdroid").apply { if (!exists()) mkdirs() }
+        val osmCache = java.io.File(appContext.cacheDir, "osmdroid_tiles").apply { if (!exists()) mkdirs() }
+
+        Configuration.getInstance().apply {
+            load(appContext, appContext.getSharedPreferences("osmdroid_prefs", Context.MODE_PRIVATE))
+            osmdroidBasePath = osmBase
+            osmdroidTileCache = osmCache
+            userAgentValue = "ComaiApp/1.0 (Android; ${appContext.packageName})"
         }
+    } catch (e: Throwable) {
+        android.util.Log.w("OsmOfflineMapView", "Error configuring osmdroid: ${e.message}")
     }
 
-    return MapView(context).apply {
-        // Standard OpenStreetMap Mapnik tiles
-        // Attribution "(c) OpenStreetMap contributors" is embedded by osmdroid's tile renderer
+    return MapView(appContext).apply {
         setTileSource(TileSourceFactory.MAPNIK)
-
-        // Built-in zoom buttons hidden - multi-touch pinch/zoom enabled instead
         zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
         setMultiTouchControls(true)
-
-        // Zoom boundaries
-        minZoomLevel = 4.0
+        minZoomLevel = 3.0
         maxZoomLevel = 19.0
-
-        // Default world view until a GPS fix arrives
-        controller.setZoom(4.0)
-        controller.setCenter(GeoPoint(20.0, 0.0))
-
-        // Scale tiles to screen DPI for crisp rendering on high-density screens
+        controller.setZoom(14.0)
+        controller.setCenter(GeoPoint(13.0827, 80.2707))
         isTilesScaledToDpi = true
+    }
+}
+
+/**
+ * Clean visual fallback card shown if native OpenStreetMap rendering encounters any system issue.
+ */
+@Composable
+private fun MapFallbackPlaceholder(
+    latitude: Double?,
+    longitude: Double?,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = Color(0xFF131A26),
+        shape = RoundedCornerShape(14.dp),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF1F2B3E)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = null,
+                    tint = ElectricTeal,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = "Location Coordinates",
+                color = Color.White,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            if (latitude != null && longitude != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = String.format(Locale.US, "%.4f° N, %.4f° E", latitude, longitude),
+                    color = ElectricTeal,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "Map view active in background",
+                color = TextSecondary,
+                fontSize = 11.sp
+            )
+        }
     }
 }
