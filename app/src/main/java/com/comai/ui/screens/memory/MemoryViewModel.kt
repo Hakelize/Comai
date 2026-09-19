@@ -1,5 +1,6 @@
 package com.comai.ui.screens.memory
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.comai.contextengine.db.Memory
@@ -19,7 +20,7 @@ import kotlinx.coroutines.launch
 /**
  * ViewModel for the Memory Tab.
  * Integrates:
- * 1. Personal Memories (Preferences, Context, Knowledge)
+ * 1. Personal Memories (Preferences, Context, Knowledge, Inferred, Episodic)
  * 2. Real Calendar & Schedules (reading from single source of truth PersonalPlanRepository)
  * 3. Nearby Context Engine (Location, Traffic, Local News, Events, and Offline state)
  */
@@ -44,21 +45,43 @@ class MemoryViewModel(
     private val _isRefreshingNearby = MutableStateFlow(false)
     val isRefreshingNearby: StateFlow<Boolean> = _isRefreshingNearby.asStateFlow()
 
+    /**
+     * Whether location permission is currently missing.
+     * Exposed so the UI can show a "Grant Location Access" CTA.
+     */
+    private val _isLocationPermissionMissing = MutableStateFlow(false)
+    val isLocationPermissionMissing: StateFlow<Boolean> = _isLocationPermissionMissing.asStateFlow()
+
     init {
         refreshNearbyContext()
     }
 
+    /**
+     * Refreshes nearby context. If provider reports permission missing,
+     * sets [isLocationPermissionMissing] = true so the UI can show a CTA.
+     */
     fun refreshNearbyContext() {
         if (nearbyContextProvider == null) return
         viewModelScope.launch {
             _isRefreshingNearby.value = true
             try {
-                nearbyContextProvider.refreshContext(plans.value)
+                val result = nearbyContextProvider.refreshContext(plans.value)
+                _isLocationPermissionMissing.value = !result.location.isPermissionGranted && result.source == "Permission Required"
             } catch (_: Exception) {
+                _isLocationPermissionMissing.value = false
             } finally {
                 _isRefreshingNearby.value = false
             }
         }
+    }
+
+    /**
+     * Called from the UI after the user grants location permission.
+     * Immediately triggers a context refresh to load real location data.
+     */
+    fun onLocationPermissionGranted() {
+        _isLocationPermissionMissing.value = false
+        refreshNearbyContext()
     }
 
     fun addPlan(

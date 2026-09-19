@@ -125,7 +125,7 @@ class GemmaEngine(
                     Log.i(TAG, "Configuring LlmInference with GPU backend...")
                     val gpuOptions = LlmInference.LlmInferenceOptions.builder()
                         .setModelPath(modelFile.absolutePath)
-                        .setMaxTokens(512)
+                        .setMaxTokens(MAX_TOKENS_GPU)
                         .setPreferredBackend(LlmInference.Backend.GPU)
                         .build()
 
@@ -139,7 +139,7 @@ class GemmaEngine(
                     try {
                         val cpuOptions = LlmInference.LlmInferenceOptions.builder()
                             .setModelPath(modelFile.absolutePath)
-                            .setMaxTokens(512)
+                            .setMaxTokens(MAX_TOKENS_CPU)
                             .setPreferredBackend(LlmInference.Backend.CPU)
                             .build()
 
@@ -169,9 +169,26 @@ class GemmaEngine(
             return fallbackEngine.process(context)
         }
 
+        // Fast-path: When user explicitly asks about their profile, personal memories, or schedule,
+        // answer instantly from verified ground truth with 0 latency and 0 hallucination.
+        val taskLower = context.task.lowercase()
+        val isDirectMemoryOrProfileQuery = taskLower.contains("memory") || taskLower.contains("remember") ||
+                taskLower.contains("what do you know") || taskLower.contains("who am i") ||
+                taskLower.contains("my name") || taskLower.contains("my schedule") ||
+                taskLower.contains("my plan") || taskLower.contains("my routine") ||
+                taskLower.contains("my work") || taskLower.contains("my office") ||
+                taskLower.contains("my college") || taskLower.contains("recall") ||
+                taskLower.contains("about me") || taskLower.contains("do you know me")
+
+        if (isDirectMemoryOrProfileQuery && (!context.retrievedData.isNullOrBlank() || !context.memoryContext.isNullOrEmpty())) {
+            Log.i(TAG, "Fast-path: Answering personal memory query from verified ground truth.")
+            return fallbackEngine.process(context)
+        }
+
         return withContext(Dispatchers.IO) {
             try {
-                val prompt = buildGemmaPrompt(context)
+                val fullPrompt = buildGemmaPrompt(context)
+                val prompt = if (fullPrompt.length > 3000) fullPrompt.take(3000) else fullPrompt
                 Log.d(TAG, "Executing Gemma 4 on-device inference ($activeBackend)...")
                 val startTime = System.currentTimeMillis()
                 val rawOutput = currentInference.generateResponse(prompt)
@@ -201,13 +218,23 @@ class GemmaEngine(
 
     private fun buildGemmaPrompt(input: ContextInput): String {
         val sb = StringBuilder()
+        // 1. Initial System Context & Stored Memories Turn
         sb.append("<start_of_turn>user\n")
         sb.append(BASE_SYSTEM_PROMPT.trim())
-        sb.append("\n\n--- BASE KNOWLEDGE & SCENARIOS ---\n")
+        sb.append("\n\n--- STRICT GROUNDING RULES ---\n")
+        sb.append(GROUNDING_RULES.trim())
+        sb.append("\n\n--- SCENARIO GUIDELINES ---\n")
         sb.append(BASE_SCENARIOS.trim())
+        val now = java.util.Calendar.getInstance()
+        val timeFormat = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(now.time)
+        val dateFormat = java.text.SimpleDateFormat("EEEE, MMMM d, yyyy", java.util.Locale.getDefault()).format(now.time)
+        val tz = java.util.TimeZone.getDefault().getDisplayName(false, java.util.TimeZone.SHORT)
+
         sb.append("\n\n--- CURRENT CONTEXT ---\n")
+        sb.append("Exact Device Time: $timeFormat ($tz)\n")
+        sb.append("Exact Device Date: $dateFormat\n")
         if (input.contextSignals.time.isNotBlank()) {
-            sb.append("Time of day: ${input.contextSignals.time}\n")
+            sb.append("Period of day: ${input.contextSignals.time}\n")
         }
         if (input.contextSignals.location.isNotBlank()) {
             sb.append("Current Location: ${input.contextSignals.location}\n")
@@ -215,18 +242,55 @@ class GemmaEngine(
         if (input.contextSignals.routineDeviation) {
             sb.append("Routine Status: Deviation detected from usual schedule\n")
         }
+
+        // Separate onboarding-sourced profile facts from general memories for clarity
         val retrieved = input.retrievedData?.trim()
         val memContextList = input.memoryContext
-        if (!retrieved.isNullOrBlank()) {
-            sb.append("Stored Personal Memories:\n$retrieved\n")
-        } else if (!memContextList.isNullOrEmpty()) {
-            val formatted = memContextList.joinToString("\n") { "- $it" }
-            sb.append("Stored Personal Memories:\n$formatted\n")
-        } else {
-            sb.append("Stored Personal Memories: None recorded yet\n")
+
+        val allMemoryText = when {
+            !retrieved.isNullOrBlank() -> retrieved
+            !memContextList.isNullOrEmpty() -> memContextList.joinToString("\n") { "- $it" }
+            else -> null
         }
-        sb.append("\nUser message: ${input.task}\n")
-        sb.append("Respond as Comai, adopting the companion persona and base knowledge above. Keep the response warm, natural, and concise (under 40 words).<end_of_turn>\n")
+
+        if (!allMemoryText.isNullOrBlank()) {
+            val profileFacts = memContextList?.filter { fact ->
+                val fl = fact.lowercase()
+                fl.contains("name is") || fl.contains("work") || fl.contains("college") ||
+                fl.contains("wake") || fl.contains("sleep") || fl.contains("schedule") ||
+                fl.contains("leaves") || fl.contains("returns") || fl.contains("departure")
+            }
+            if (!profileFacts.isNullOrEmpty()) {
+                sb.append("User Profile Facts (use these to answer personal questions):\n")
+                profileFacts.forEach { sb.append("  • $it\n") }
+                sb.append("\n")
+            }
+            sb.append("All Stored Personal Memories:\n$allMemoryText\n")
+        } else {
+            sb.append("Stored Personal Memories: None recorded yet.\n")
+        }
+
+        sb.append("Acknowledge instructions.<end_of_turn>\n")
+        sb.append("<start_of_turn>model\nUnderstood. I am Comai, ready to assist based on your context and memories.<end_of_turn>\n")
+
+        // 2. Previous Back-and-Forth Multi-Turn Conversation History
+        val history = input.conversationHistory
+        if (!history.isNullOrEmpty()) {
+            val recentTurns = history.takeLast(6)
+            for (turn in recentTurns) {
+                if (turn.content.isNotBlank()) {
+                    val turnRole = if (turn.role.equals("model", true) || turn.role.equals("comai", true)) "model" else "user"
+                    sb.append("<start_of_turn>$turnRole\n")
+                    sb.append(turn.content.trim())
+                    sb.append("<end_of_turn>\n")
+                }
+            }
+        }
+
+        // 3. Current User Message Turn
+        sb.append("<start_of_turn>user\n")
+        sb.append(input.task.trim())
+        sb.append("<end_of_turn>\n")
         sb.append("<start_of_turn>model\n")
         return sb.toString()
     }
@@ -237,7 +301,33 @@ class GemmaEngine(
             .replace("<start_of_turn>user", "")
             .replace("<end_of_turn>", "")
             .trim()
-        return text.ifBlank { "I'm right here with you. How can I help?" }
+        if (text.isBlank()) return "I'm right here with you. How can I help?"
+        return truncateToLastCompleteSentence(text)
+    }
+
+    /**
+     * Truncates text to the last complete sentence to avoid mid-word or mid-phrase cutoffs.
+     * Looks for the last sentence-ending punctuation (.!?) and trims there.
+     */
+    private fun truncateToLastCompleteSentence(text: String): String {
+        val trimmed = text.trim()
+        // If already ends with sentence punctuation, return as-is
+        if (trimmed.endsWith(".") || trimmed.endsWith("!") || trimmed.endsWith("?") ||
+            trimmed.endsWith(".\"") || trimmed.endsWith("!\"") || trimmed.endsWith("?\"")) {
+            return trimmed
+        }
+        // Find the last sentence-ending punctuation
+        val lastPeriod = trimmed.lastIndexOf('.')
+        val lastExclaim = trimmed.lastIndexOf('!')
+        val lastQuestion = trimmed.lastIndexOf('?')
+        val lastEnd = maxOf(lastPeriod, lastExclaim, lastQuestion)
+        return if (lastEnd > trimmed.length / 3) {
+            // Only truncate if the last sentence end is reasonably far into the text
+            trimmed.substring(0, lastEnd + 1).trim()
+        } else {
+            // If no good sentence boundary, append an ellipsis to signal incompleteness
+            "$trimmed…"
+        }
     }
 
     private fun cleanForTts(text: String): String {
@@ -250,7 +340,9 @@ class GemmaEngine(
     private fun determineAction(task: String, responseText: String = ""): String {
         val combined = "$task $responseText".lowercase()
         return when {
-            combined.contains("memory") || combined.contains("remember") || combined.contains("know about me") || combined.contains("recall") -> "memory_recall"
+            combined.contains("memory") || combined.contains("remember") || combined.contains("know about me") ||
+            combined.contains("recall") || combined.contains("who am i") || combined.contains("my name") ||
+            combined.contains("about me") || combined.contains("my schedule") || combined.contains("what do you know") -> "memory_recall"
             combined.contains("morning") || combined.contains("wake") || combined.contains("good morning") -> "greeting"
             combined.contains("commute") || combined.contains("traffic") || combined.contains("route") || combined.contains("delay") -> "commute"
             combined.contains("tribe") || combined.contains("club") || combined.contains("meetup") || combined.contains("running") || combined.contains("event") -> "tribe_event"
@@ -297,23 +389,30 @@ class GemmaEngine(
     companion object {
         private const val TAG = "GemmaEngine"
         const val MODEL_FILENAME = "gemma-4-E4B-it.litertlm"
+        private const val MAX_TOKENS_GPU = 1536
+        private const val MAX_TOKENS_CPU = 1536
 
         private const val BASE_SYSTEM_PROMPT = """
 You are Comai, a warm, caring, proactive on-device personal AI life companion.
 All personal data and memories stay strictly private and local to the user's phone.
-Your responses should be conversational, supportive, concise (under 40 words), and tailored to the user's daily life.
+Your responses must be conversational, supportive, concise (under 40 words), and always grounded in the user's actual stored memories.
+"""
+
+        private const val GROUNDING_RULES = """
+CRITICAL RULES — follow these strictly:
+1. ONLY use facts from "Stored Personal Memories" to answer personal questions. Never invent user facts.
+2. If personal detail is NOT in stored memories, say: "I don't have that stored yet. You can tell me and I'll remember it!"
+3. If stored memories ARE present, ALWAYS use them.
+4. When asked for current time or date, answer directly using "Exact Device Time" and "Exact Device Date".
+5. When asked for current location, use "Current Location".
 """
 
         private const val BASE_SCENARIOS = """
-Base knowledge and scenario guidelines:
-1. Memory & Privacy: When user asks what you remember or know about them, summarize the saved memories clearly, and reassure them that all memories stay on their device and can be reviewed or deleted anytime. If there are no saved memories, tell them what kinds of things you can remember (commute habits, office location, music preferences).
-2. Morning Routine: If morning or user wakes early, greet them warmly ("Good morning! You're up a bit earlier than usual today. Want me to adjust your morning routine?").
-3. Commute & Traffic: For commute/traffic queries, suggest optimal departure times (e.g. 8:15) and advise on traffic delays near highway exits.
-4. Tribe Finder: Suggest local community meetups (e.g., Evening Run Club meetup near the office at 6 PM with 14 attendees) and offer to set reminders.
-5. Lunch & Breaks: Around lunchtime, offer quick nearby food options or help order from regular favorite spots.
-6. Evening & Overtime: If working late or departing later than usual, ask thoughtful check-ins ("You're leaving later than usual today. How was work?").
-7. Wind-down & Night: At bedtime, remind about evening medication, dimming down, and getting restful sleep ("Time to wind down. Don't forget your evening medication. Sleep well!").
-8. Reminders: Confirm reminders clearly with live traffic departure alerts.
+Scenarios:
+1. Memory & Privacy: Summarize saved memories; reassure user data is local.
+2. Morning/Evening: Greet using user's name if known; refer to schedule.
+3. Commute/Traffic: Advise based on stored departure times.
+4. Reminders/Health: Confirm tasks and wellness gently.
 """
     }
 }

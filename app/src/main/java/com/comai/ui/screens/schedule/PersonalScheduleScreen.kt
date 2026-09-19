@@ -428,7 +428,7 @@ fun PersonalScheduleScreen(
 }
 
 @Composable
-private fun MenstrualCycleCard(
+fun MenstrualCycleCard(
     cycleData: MenstrualCycleData,
     estimate: MenstrualCycleEstimate?,
     onConfigureClick: () -> Unit

@@ -106,6 +106,19 @@ fun MemoryScreen(
     var planForDetails by remember { mutableStateOf<PersonalPlan?>(null) }
     var isAddingNewPlan by remember { mutableStateOf(false) }
 
+    val onboardingPrefs = remember { com.comai.ui.screens.onboarding.OnboardingPreferences(context) }
+    var userProfile by remember { mutableStateOf(onboardingPrefs.getProfile()) }
+    val isFemale = userProfile.gender.equals("Female", ignoreCase = true)
+
+    val menstrualCyclePrefs = remember { com.comai.data.menstrualcycle.MenstrualCyclePreferences(context) }
+    var cycleData by remember { mutableStateOf(menstrualCyclePrefs.getCycleData()) }
+    val cycleEstimate = remember(cycleData) { com.comai.data.menstrualcycle.MenstrualCycleCalculator.calculateEstimate(cycleData) }
+    var showCycleDialog by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        userProfile = onboardingPrefs.getProfile()
+        cycleData = menstrualCyclePrefs.getCycleData()
+    }
+
     val canExactAlarm = remember { AlarmPermissionUtils.canScheduleExactAlarms(context) }
 
     // Selected ISO date: "yyyy-MM-dd"
@@ -125,11 +138,17 @@ fun MemoryScreen(
             .sortedBy { TimeUtils.parseTime(it.time).toMinutesOfDay() }
     }
 
-    // Location Permission launcher
+    // Location Permission launcher — notifies ViewModel when result arrives
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) {
-        viewModel.refreshNearbyContext()
+    ) { permissions ->
+        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (granted) {
+            viewModel.onLocationPermissionGranted()
+        } else {
+            viewModel.refreshNearbyContext()
+        }
     }
 
     Scaffold(
@@ -374,17 +393,27 @@ fun MemoryScreen(
                     },
                     onRefresh = { viewModel.refreshNearbyContext() },
                     onOpenSettings = {
-                        val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
-                        context.startActivity(intent)
+                        try {
+                            val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        } catch (_: Exception) {}
                     },
                     onOpenMaps = { lat, lng ->
-                        val uri = Uri.parse("geo:$lat,$lng?q=$lat,$lng(Current+Location)")
-                        val mapIntent = Intent(Intent.ACTION_VIEW, uri)
                         try {
+                            val uri = Uri.parse("geo:$lat,$lng?q=$lat,$lng(Current+Location)")
+                            val mapIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
                             context.startActivity(mapIntent)
                         } catch (_: Exception) {
-                            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://maps.google.com/?q=$lat,$lng"))
-                            context.startActivity(webIntent)
+                            try {
+                                val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://maps.google.com/?q=$lat,$lng")).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(webIntent)
+                            } catch (_: Exception) {}
                         }
                     }
                 )
@@ -488,7 +517,28 @@ fun MemoryScreen(
             }
 
             // ==========================================
-            // 5. PERSONAL MEMORIES (Stored Knowledge)
+            // 5. HEALTH & WELLNESS (Menstrual Cycle Tracking)
+            // ==========================================
+            if (isFemale || cycleData.isConfigured) {
+                item {
+                    Text(
+                        text = "Health & Wellness",
+                        color = ElectricTeal,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+
+                    MenstrualCycleCard(
+                        cycleData = cycleData,
+                        estimate = cycleEstimate,
+                        onConfigureClick = { showCycleDialog = true }
+                    )
+                }
+            }
+
+            // ==========================================
+            // 6. PERSONAL MEMORIES (Stored Knowledge)
             // ==========================================
             item {
                 Row(
@@ -606,6 +656,19 @@ fun MemoryScreen(
             onSave = { title, time, repeatFrequency, reminderType, date ->
                 viewModel.updatePlan(plan.id, title, time, repeatFrequency, reminderType, plan.isEnabled, date)
                 planToEdit = null
+            }
+        )
+    }
+
+    // Menstrual Cycle Dialog
+    if (showCycleDialog) {
+        MenstrualCycleDialog(
+            initialData = cycleData,
+            onDismiss = { showCycleDialog = false },
+            onSave = { updatedData ->
+                menstrualCyclePrefs.saveCycleData(updatedData)
+                cycleData = updatedData
+                showCycleDialog = false
             }
         )
     }
@@ -1029,6 +1092,25 @@ private fun MemoryLocationMapCard(
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
+
+                    // Map loading hint (tiles need internet on first load)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Info,
+                            contentDescription = null,
+                            tint = TextSecondary,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Map tiles require internet on first load. Cached tiles work offline.",
+                            color = TextSecondary,
+                            fontSize = 10.sp
+                        )
+                    }
 
                     // Location Name & Details
                     Text(

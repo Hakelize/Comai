@@ -1,5 +1,6 @@
 package com.comai.data.models
 
+import com.comai.search.SearchResult
 import java.util.UUID
 
 /**
@@ -17,5 +18,8 @@ data class ChatMessage(
     /** "image" or "document" */
     val mediaType: String? = null,
     /** Optional display filename. */
-    val mediaName: String? = null
+    val mediaName: String? = null,
+    /** Web search citations associated with this AI response. */
+    val citations: List<SearchResult>? = null
 )
+

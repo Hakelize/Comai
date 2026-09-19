@@ -68,7 +68,7 @@ class MainActivity : ComponentActivity() {
         val chatViewModel = ViewModelProvider(this, object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return ChatViewModel(aiEngine, ttsManager, contextBridge, memoryRepository, textNormalizer, app.memoryContextProvider) as T
+                return ChatViewModel(aiEngine, ttsManager, contextBridge, memoryRepository, textNormalizer, app.memoryContextProvider, applicationContext) as T
             }
         })[ChatViewModel::class.java]
 
@@ -118,7 +118,11 @@ class MainActivity : ComponentActivity() {
         val onboardingViewModel = ViewModelProvider(this, object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return com.comai.ui.screens.onboarding.OnboardingViewModel(onboardingPreferences, userProfileDao) as T
+                return com.comai.ui.screens.onboarding.OnboardingViewModel(
+                    onboardingPreferences,
+                    userProfileDao,
+                    memoryRepository
+                ) as T
             }
         })[com.comai.ui.screens.onboarding.OnboardingViewModel::class.java]
 

@@ -95,7 +95,19 @@ class MemoryRepository(
                 lowerTask.contains("who am i") ||
                 lowerTask.contains("my preferences") ||
                 lowerTask.contains("about me") ||
-                lowerTask.contains("myself")
+                lowerTask.contains("myself") ||
+                lowerTask.contains("today") ||
+                lowerTask.contains("plan") ||
+                lowerTask.contains("schedule") ||
+                lowerTask.contains("iqoo") ||
+                lowerTask.contains("reskill") ||
+                lowerTask.contains("chennai") ||
+                lowerTask.contains("tell me") ||
+                lowerTask.contains("what am i") ||
+                lowerTask.contains("what's my") ||
+                lowerTask.contains("whats my") ||
+                lowerTask.contains("comai") ||
+                lowerTask.contains("event")
 
         if (isBroadRecall) {
             return allMemories
@@ -151,42 +163,48 @@ class MemoryRepository(
         val relevant = getRelevantMemoriesList(task, signals)
         if (relevant.isEmpty()) return null
 
-        // Compact, structured formatting
+        // Compact, structured formatting grouped by type
         val preferences = relevant.filter { it.type == "PREFERENCE" }
         val context = relevant.filter { it.type == "CONTEXT" }
         val personal = relevant.filter { it.type == "PERSONAL_KNOWLEDGE" }
-        val other = relevant.filter { it.type != "PREFERENCE" && it.type != "CONTEXT" && it.type != "PERSONAL_KNOWLEDGE" }
+        val inferred = relevant.filter { it.type == "INFERRED" }
+        val episodic = relevant.filter { it.type == "EPISODIC" }
+        val other = relevant.filter { it.type !in setOf("PREFERENCE", "CONTEXT", "PERSONAL_KNOWLEDGE", "INFERRED", "EPISODIC") }
 
         val sb = StringBuilder()
         if (preferences.isNotEmpty()) {
             sb.append("Preferences:\n")
-            for (p in preferences) {
-                sb.append("- ").append(p.toDisplayString()).append("\n")
-            }
+            for (p in preferences) { sb.append("- ").append(p.toDisplayString()).append("\n") }
         }
 
         if (context.isNotEmpty()) {
             if (sb.isNotEmpty()) sb.append("\n")
             sb.append("Context:\n")
-            for (c in context) {
-                sb.append("- ").append(c.toDisplayString()).append("\n")
-            }
+            for (c in context) { sb.append("- ").append(c.toDisplayString()).append("\n") }
         }
 
         if (personal.isNotEmpty()) {
             if (sb.isNotEmpty()) sb.append("\n")
             sb.append("Personal Knowledge:\n")
-            for (k in personal) {
-                sb.append("- ").append(k.toDisplayString()).append("\n")
-            }
+            for (k in personal) { sb.append("- ").append(k.toDisplayString()).append("\n") }
+        }
+
+        if (inferred.isNotEmpty()) {
+            if (sb.isNotEmpty()) sb.append("\n")
+            sb.append("Inferred from Activity:\n")
+            for (i in inferred) { sb.append("- ").append(i.value).append("\n") }
+        }
+
+        if (episodic.isNotEmpty()) {
+            if (sb.isNotEmpty()) sb.append("\n")
+            sb.append("Recent Conversation Context:\n")
+            for (e in episodic.take(3)) { sb.append("- ").append(e.value).append("\n") }
         }
 
         if (other.isNotEmpty()) {
             if (sb.isNotEmpty()) sb.append("\n")
             sb.append("Other Information:\n")
-            for (o in other) {
-                sb.append("- ").append(o.toDisplayString()).append("\n")
-            }
+            for (o in other) { sb.append("- ").append(o.toDisplayString()).append("\n") }
         }
 
         return sb.toString().trim().ifEmpty { null }

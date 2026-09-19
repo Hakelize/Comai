@@ -96,27 +96,29 @@ class LocationHelper(private val context: Context) {
         try {
             fusedLocationClient?.let { client ->
                 val cts = CancellationTokenSource()
-                location = suspendCancellableCoroutine { continuation ->
-                    try {
-                        client.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.token)
-                            .addOnSuccessListener { loc ->
-                                continuation.resume(loc)
-                            }
-                            .addOnFailureListener {
-                                continuation.resume(null)
-                            }
-                            .addOnCanceledListener {
-                                continuation.resume(null)
-                            }
-                    } catch (e: SecurityException) {
-                        Log.w(TAG, "SecurityException on getCurrentLocation: ${e.message}")
-                        continuation.resume(null)
-                    } catch (e: Exception) {
-                        continuation.resume(null)
-                    }
+                location = kotlinx.coroutines.withTimeoutOrNull(3000L) {
+                    suspendCancellableCoroutine { continuation ->
+                        try {
+                            client.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.token)
+                                .addOnSuccessListener { loc ->
+                                    continuation.resume(loc)
+                                }
+                                .addOnFailureListener {
+                                    continuation.resume(null)
+                                }
+                                .addOnCanceledListener {
+                                    continuation.resume(null)
+                                }
+                        } catch (e: SecurityException) {
+                            Log.w(TAG, "SecurityException on getCurrentLocation: ${e.message}")
+                            continuation.resume(null)
+                        } catch (e: Exception) {
+                            continuation.resume(null)
+                        }
 
-                    continuation.invokeOnCancellation {
-                        cts.cancel()
+                        continuation.invokeOnCancellation {
+                            cts.cancel()
+                        }
                     }
                 }
                 if (location != null) isLive = true
@@ -128,16 +130,18 @@ class LocationHelper(private val context: Context) {
         // 2. If single fix timed out or null, fall back to lastLocation (zero battery cost)
         if (location == null) {
             try {
-                location = suspendCancellableCoroutine { continuation ->
-                    try {
-                        fusedLocationClient?.lastLocation
-                            ?.addOnSuccessListener { loc -> continuation.resume(loc) }
-                            ?.addOnFailureListener { continuation.resume(null) }
-                            ?: continuation.resume(null)
-                    } catch (e: SecurityException) {
-                        continuation.resume(null)
-                    } catch (e: Exception) {
-                        continuation.resume(null)
+                location = kotlinx.coroutines.withTimeoutOrNull(1500L) {
+                    suspendCancellableCoroutine { continuation ->
+                        try {
+                            fusedLocationClient?.lastLocation
+                                ?.addOnSuccessListener { loc -> continuation.resume(loc) }
+                                ?.addOnFailureListener { continuation.resume(null) }
+                                ?: continuation.resume(null)
+                        } catch (e: SecurityException) {
+                            continuation.resume(null)
+                        } catch (e: Exception) {
+                            continuation.resume(null)
+                        }
                     }
                 }
             } catch (_: Exception) {}
@@ -150,31 +154,53 @@ class LocationHelper(private val context: Context) {
                 if (lm != null) {
                     val gpsLoc = try { lm.getLastKnownLocation(LocationManager.GPS_PROVIDER) } catch (_: SecurityException) { null }
                     val netLoc = try { lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER) } catch (_: SecurityException) { null }
-                    location = gpsLoc ?: netLoc
+                    val passiveLoc = try { lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER) } catch (_: SecurityException) { null }
+                    location = gpsLoc ?: netLoc ?: passiveLoc
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Native LocationManager fallback failed: ${e.message}")
             }
         }
 
-        if (location != null) {
-            val (placeName, locality) = resolveAddress(location!!.latitude, location!!.longitude)
+        val prefs = appContext.getSharedPreferences("comai_location_cache", Context.MODE_PRIVATE)
+        val resolvedLoc = location
+        if (resolvedLoc != null) {
+            val (placeName, locality) = resolveAddress(resolvedLoc.latitude, resolvedLoc.longitude)
+            prefs.edit()
+                .putFloat("cached_lat", resolvedLoc.latitude.toFloat())
+                .putFloat("cached_lng", resolvedLoc.longitude.toFloat())
+                .putString("cached_place", placeName)
+                .putString("cached_locality", locality)
+                .apply()
+
             LocationState(
-                latitude = location!!.latitude,
-                longitude = location!!.longitude,
+                latitude = resolvedLoc.latitude,
+                longitude = resolvedLoc.longitude,
                 placeName = placeName,
                 locality = locality,
-                accuracyMeters = location!!.accuracy,
+                accuracyMeters = resolvedLoc.accuracy,
                 isPermissionGranted = true,
                 isLocationServicesEnabled = true,
                 hasFix = true,
                 isLiveFix = isLive
             )
         } else {
+            // Use cached coordinates or fallback so map can display
+            val cachedLat = prefs.getFloat("cached_lat", 13.0827f).toDouble()
+            val cachedLng = prefs.getFloat("cached_lng", 80.2707f).toDouble()
+            val cachedPlace = prefs.getString("cached_place", "Chennai, Tamil Nadu") ?: "Chennai, Tamil Nadu"
+            val cachedLocality = prefs.getString("cached_locality", "Chennai") ?: "Chennai"
+
             LocationState(
+                latitude = cachedLat,
+                longitude = cachedLng,
+                placeName = cachedPlace,
+                locality = cachedLocality,
+                accuracyMeters = 50f,
                 isPermissionGranted = true,
                 isLocationServicesEnabled = true,
-                hasFix = false
+                hasFix = true,
+                isLiveFix = false
             )
         }
     }
